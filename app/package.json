@@ -12,6 +12,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.117.1",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-table": "^8.21.3",
     "echarts": "^6.1.0",

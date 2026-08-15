@@ -14,6 +14,7 @@ import {
   type Combo,
   type ComboResult,
   type HeatKey,
+  type PriceOverrides,
   type WwKey,
 } from '../lib/invest'
 import type { Tier } from '../lib/schema'
@@ -21,12 +22,12 @@ import { chartTokens, deEmphasis, type Mode } from '../lib/palette'
 
 /** feste Farben je kuratierter Kombination; eigene Kombination = violett */
 const PRESET_COLOR: Record<string, { light: string; dark: string }> = {
-  'woodNew|0|bestand': { light: '#eb6834', dark: '#d95926' },
-  'pellet|0|bestand': { light: '#e87ba4', dark: '#d55181' },
-  'heatPump|0|bestand': { light: '#2a78d6', dark: '#3987e5' },
-  'bestand|15|bestand': { light: '#eda100', dark: '#c98500' },
-  'heatPump|15|bestand': { light: '#1baf7a', dark: '#199e70' },
-  'pellet|15|bwwp': { light: '#008300', dark: '#008300' },
+  'woodNew|0|0|bestand|-': { light: '#eb6834', dark: '#d95926' },
+  'pellet|0|0|bestand|-': { light: '#e87ba4', dark: '#d55181' },
+  'heatPump|0|0|bestand|-': { light: '#2a78d6', dark: '#3987e5' },
+  'bestand|15|0|bestand|-': { light: '#eda100', dark: '#c98500' },
+  'heatPump|15|10|bestand|-': { light: '#1baf7a', dark: '#199e70' },
+  'pellet|15|0|bwwp|-': { light: '#008300', dark: '#008300' },
 }
 const CUSTOM_COLOR = { light: '#4a3aa7', dark: '#9085e9' }
 
@@ -39,18 +40,111 @@ const TIER_LABEL: Record<Tier, string> = {
   premium: 'Premium-Anbieter',
 }
 
+type OvKey = keyof PriceOverrides
+
+interface SliderCfg {
+  key: OvKey
+  label: string
+  min: number
+  max: number
+  step: number
+  market: number
+  /** Formatierung des Werts (Standard: EUR gesamt) */
+  perUnit?: string
+  totalOf?: (v: number) => number
+}
+
+const roundTo = (v: number, step: number) => Math.round(v / step) * step
+
 export function Invest() {
   const { bundle } = useData()
   const mode = useTheme()
   const t = chartTokens(mode)
   const inv = bundle.investment
+  const s = inv.scenarios
   const [tier, setTier] = useState<Tier>('typisch')
-  const [custom, setCustom] = useState<Combo>({ heat: 'pellet', pvKwp: 20, ww: 'bwwp' })
+  const [custom, setCustom] = useState<Combo>({ heat: 'pellet', pvKwp: 20, batteryKwh: 10, ww: 'bwwp', klima: false })
+  const [overrides, setOverrides] = useState<Partial<Record<OvKey, number>>>({})
+  const [tab, setTab] = useState<'verlauf' | 'jahr' | 'karten'>('verlauf')
+
+  const heatSpec =
+    custom.heat === 'woodNew' ? s.woodNew : custom.heat === 'pellet' ? s.pellet : custom.heat === 'heatPump' ? s.heatPump : null
+  const needsElektro = custom.pvKwp > 0 || custom.heat === 'heatPump' || (custom.pvKwp > 0 && custom.batteryKwh > 0) || custom.klima
+  const wwSpec = custom.ww === 'bwwp' ? inv.ww.bwwp : custom.ww === 'heizstab' ? inv.ww.heizstab : null
+
+  /** Regler fuer alle CAPEX-Einzelposten der aktuellen Kombination */
+  const sliders: SliderCfg[] = []
+  if (heatSpec)
+    sliders.push({
+      key: 'heatCapexEur',
+      label: `${HEAT_LABEL[custom.heat]} komplett inkl. Einbau`,
+      min: roundTo(heatSpec.capexEur.guenstig * 0.5, 500),
+      max: roundTo(heatSpec.capexEur.premium * 1.4, 500),
+      step: 500,
+      market: heatSpec.capexEur[tier],
+    })
+  if (custom.pvKwp > 0)
+    sliders.push({
+      key: 'pvEurPerKwp',
+      label: `Photovoltaik (${custom.pvKwp} kWp)`,
+      min: roundTo(s.pv.capexPerKwp.guenstig * 0.6, 25),
+      max: roundTo(s.pv.capexPerKwp.premium * 1.5, 25),
+      step: 25,
+      market: s.pv.capexPerKwp[tier],
+      perUnit: '€/kWp',
+      totalOf: (v) => v * custom.pvKwp,
+    })
+  if (custom.pvKwp > 0 && custom.batteryKwh > 0)
+    sliders.push({
+      key: 'batteryEurPerKwh',
+      label: `Stromspeicher (${custom.batteryKwh} kWh)`,
+      min: roundTo(s.battery.capexPerKwh.guenstig * 0.6, 25),
+      max: roundTo(s.battery.capexPerKwh.premium * 1.5, 25),
+      step: 25,
+      market: s.battery.capexPerKwh[tier],
+      perUnit: '€/kWh',
+      totalOf: (v) => v * custom.batteryKwh,
+    })
+  if (wwSpec)
+    sliders.push({
+      key: 'wwCapexEur',
+      label: WW_LABEL[custom.ww],
+      min: Math.max(100, roundTo(wwSpec.capexEur * 0.3, 50)),
+      max: roundTo(wwSpec.capexEur * 2.5, 50),
+      step: 50,
+      market: wwSpec.capexEur,
+    })
+  if (custom.klima)
+    sliders.push({
+      key: 'klimaCapexEur',
+      label: 'Klimaanlage OG inkl. Einbau',
+      min: roundTo(s.klima.capexEur.guenstig * 0.5, 250),
+      max: roundTo(s.klima.capexEur.premium * 1.5, 250),
+      step: 250,
+      market: s.klima.capexEur[tier],
+    })
+  if (needsElektro)
+    sliders.push({
+      key: 'elektroCapexEur',
+      label: 'Elektro & Installation (Zählerschrank, Leitungen, Anmeldung)',
+      min: roundTo(s.elektro.capexEur.guenstig * 0.5, 100),
+      max: roundTo(s.elektro.capexEur.premium * 1.6, 100),
+      step: 100,
+      market: s.elektro.capexEur[tier],
+    })
+  const activeOvCount = sliders.filter((sl) => overrides[sl.key] !== undefined).length
 
   const { results, statusQuo, customResult, best } = useMemo(() => {
     const statusQuo = computeCombo(inv, tier, STATUS_QUO)
     const presetResults = PRESETS.map((c) => computeCombo(inv, tier, c))
-    const customResult = computeCombo(inv, tier, custom)
+    const ov: PriceOverrides = {}
+    for (const sl of sliders) if (overrides[sl.key] !== undefined) ov[sl.key] = overrides[sl.key]
+    const hasOv = Object.keys(ov).length > 0
+    const customResult = computeCombo(inv, tier, custom, ov)
+    if (hasOv) {
+      customResult.key += '|A'
+      customResult.label += ' · Angebotspreise'
+    }
     const isDuplicate =
       customResult.key === statusQuo.key || presetResults.some((r) => r.key === customResult.key)
     const results = [statusQuo, ...presetResults, ...(isDuplicate ? [] : [customResult])]
@@ -58,7 +152,8 @@ export function Invest() {
     const candidates = results.filter((r) => r.key !== statusQuo.key)
     const best = candidates.reduce((a, b) => (b.horizonSavings > a.horizonSavings ? b : a))
     return { results, statusQuo, customResult: isDuplicate ? null : customResult, best }
-  }, [inv, tier, custom])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inv, tier, custom, overrides])
 
   const startYear = new Date().getFullYear()
   const H = inv.horizonYears
@@ -197,6 +292,22 @@ export function Invest() {
     </div>
   )
 
+  const tabBtn = (key: typeof tab, label: string) => (
+    <button
+      key={key}
+      type="button"
+      onClick={() => setTab(key)}
+      aria-pressed={tab === key}
+      className="rounded-full px-3 py-1.5 text-sm font-medium"
+      style={{
+        background: tab === key ? 'var(--accent)' : 'transparent',
+        color: tab === key ? '#fff' : 'var(--text-secondary)',
+      }}
+    >
+      {label}
+    </button>
+  )
+
   return (
     <div className="space-y-4">
       {/* Baukasten */}
@@ -219,11 +330,25 @@ export function Invest() {
           options={[['0', 'keine'], ['10', '10 kWp'], ['15', '15 kWp'], ['20', '20 kWp'], ['25', '25 kWp']]}
           onChange={(v) => setCustom((c) => ({ ...c, pvKwp: Number(v) }))}
         />
+        {custom.pvKwp > 0 && (
+          <Chips<`${number}`>
+            label="Speicher"
+            value={String(custom.batteryKwh) as `${number}`}
+            options={[['0', 'keiner'], ['5', '5 kWh'], ['10', '10 kWh'], ['15', '15 kWh']]}
+            onChange={(v) => setCustom((c) => ({ ...c, batteryKwh: Number(v) }))}
+          />
+        )}
         <Chips<WwKey>
           label="Warmwasser"
           value={custom.ww}
           options={(Object.entries(WW_LABEL) as [WwKey, string][])}
           onChange={(ww) => setCustom((c) => ({ ...c, ww }))}
+        />
+        <Chips<'ja' | 'nein'>
+          label="Klima OG"
+          value={custom.klima ? 'ja' : 'nein'}
+          options={[['nein', 'ohne'], ['ja', '❄ Klimaanlage Schlafzimmer']]}
+          onChange={(v) => setCustom((c) => ({ ...c, klima: v === 'ja' }))}
         />
         <Chips<Tier>
           label="Kostenstruktur"
@@ -234,6 +359,74 @@ export function Invest() {
         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
           {inv.tierEffects.note}
         </p>
+
+        {/* Angebotspreise als Akkordeon, damit der Baukasten uebersichtlich bleibt */}
+        <details className="rounded-lg border" style={{ borderColor: 'var(--grid)' }}>
+          <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium">
+            💶 Angebotspreise einstellen
+            <span className="ml-2 font-normal" style={{ color: 'var(--text-muted)' }}>
+              {activeOvCount > 0
+                ? `${activeOvCount} Posten angepasst`
+                : 'voreingestellt: Marktwerte der gewählten Kostenstruktur'}
+            </span>
+          </summary>
+          <div className="space-y-3 px-3 pb-3 pt-1">
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              Du hast ein echtes Angebot? Stell hier den Preis jedes Einzelpostens ein — gilt für{' '}
+              <strong>deine Kombination</strong> (violett); die Vergleichskurven behalten die
+              Marktpreise. „Markt“ setzt auf den typischen Wert der Kostenstruktur zurück.
+            </p>
+            {sliders.map((sl) => {
+              const v = overrides[sl.key] ?? sl.market
+              const overridden = overrides[sl.key] !== undefined
+              return (
+                <div key={sl.key} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="w-full text-sm sm:w-72" style={{ color: 'var(--text-secondary)' }}>
+                    {sl.label}
+                  </span>
+                  <input
+                    type="range"
+                    min={sl.min}
+                    max={sl.max}
+                    step={sl.step}
+                    value={v}
+                    onChange={(e) => setOverrides((o) => ({ ...o, [sl.key]: Number(e.target.value) }))}
+                    className="h-1.5 min-w-32 flex-1"
+                    style={{ accentColor: overridden ? CUSTOM_COLOR[mode] : 'var(--accent)' }}
+                    aria-label={`Preis ${sl.label}`}
+                  />
+                  <span className="tabular w-32 text-right text-sm font-semibold">
+                    {sl.perUnit ? `${v.toLocaleString('de-DE')} ${sl.perUnit}` : fmtEur(v)}
+                    {sl.totalOf && (
+                      <span className="block text-xs font-normal" style={{ color: 'var(--text-muted)' }}>
+                        = {fmtEur(sl.totalOf(v))}
+                      </span>
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={!overridden}
+                    onClick={() => setOverrides((o) => ({ ...o, [sl.key]: undefined }))}
+                    className="w-28 text-left text-xs underline-offset-2 disabled:no-underline"
+                    style={{ color: overridden ? 'var(--accent)' : 'var(--text-muted)', textDecoration: overridden ? 'underline' : 'none' }}
+                  >
+                    {overridden ? `Markt: ${sl.perUnit ? `${sl.market.toLocaleString('de-DE')} ${sl.perUnit}` : fmtEur(sl.market)} ↺` : 'Marktwert'}
+                  </button>
+                </div>
+              )
+            })}
+            {activeOvCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setOverrides({})}
+                className="rounded-lg border px-2.5 py-1 text-xs font-medium"
+                style={{ borderColor: 'var(--baseline)' }}
+              >
+                Alle auf Marktwerte zurücksetzen
+              </button>
+            )}
+          </div>
+        </details>
       </div>
 
       {/* Hero: beste Option */}
@@ -263,40 +456,87 @@ export function Invest() {
         </p>
       </div>
 
-      {/* Kombinations-Karten */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {results
-          .filter((r) => r.key !== statusQuo.key)
-          .map((r) => (
-            <ComboCard
-              key={r.key}
-              r={r}
-              mode={mode}
-              startYear={startYear}
-              best={r.key === best.key}
-              custom={customResult !== null && r.key === customResult.key}
-            />
-          ))}
+      {/* Reiter fuer die drei Sichten */}
+      <div className="no-print flex gap-1 rounded-full border p-1" style={{ borderColor: 'var(--border)', background: 'var(--surface)', width: 'fit-content' }}>
+        {tabBtn('verlauf', 'Kostenverlauf & Break-even')}
+        {tabBtn('jahr', 'Jahreskosten')}
+        {tabBtn('karten', 'Vergleich im Detail')}
       </div>
 
-      <div className="card p-4">
-        <h2 className="mb-2 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
-          Kumulierte Gesamtkosten — der Schnittpunkt mit der grauen Linie ist der Break-even
-        </h2>
-        <EChart option={cumulativeOption} mode={mode} height={400} ariaLabel="Kumulierte Gesamtkosten aller Kombinationen über den Planungshorizont" />
-      </div>
+      {tab === 'verlauf' && (
+        <div className="card p-4">
+          <h2 className="mb-2 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+            Kumulierte Gesamtkosten — der Schnittpunkt mit der grauen Linie ist der Break-even
+          </h2>
+          <EChart option={cumulativeOption} mode={mode} height={400} ariaLabel="Kumulierte Gesamtkosten aller Kombinationen über den Planungshorizont" />
+        </div>
+      )}
 
-      <div className="card p-4">
-        <h2 className="mb-2 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
-          Äquivalente Jahreskosten (CAPEX als Annuität, {inv.interestRatePct} % Zins) — negative Energie = PV-Erträge übersteigen Zukauf
-        </h2>
-        <EChart option={annualOption} mode={mode} height={340} ariaLabel="Jahreskosten der Kombinationen nach Kostenart" />
-      </div>
+      {tab === 'jahr' && (
+        <div className="card p-4">
+          <h2 className="mb-2 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+            Äquivalente Jahreskosten (CAPEX als Annuität, {inv.interestRatePct} % Zins) — negative Energie = PV-Erträge übersteigen Zukauf
+          </h2>
+          <EChart option={annualOption} mode={mode} height={340} ariaLabel="Jahreskosten der Kombinationen nach Kostenart" />
+        </div>
+      )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="card p-5 text-sm">
-          <h3 className="font-semibold">Datenbasis</h3>
-          <ul className="mt-2 list-disc space-y-1 pl-5" style={{ color: 'var(--text-secondary)' }}>
+      {tab === 'karten' && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {results
+            .filter((r) => r.key !== statusQuo.key)
+            .map((r) => (
+              <ComboCard
+                key={r.key}
+                r={r}
+                mode={mode}
+                startYear={startYear}
+                best={r.key === best.key}
+                custom={customResult !== null && r.key === customResult.key}
+              />
+            ))}
+        </div>
+      )}
+
+      {/* Einzelposten deiner Kombination */}
+      {customResult !== null && (
+        <div className="card p-4 text-sm">
+          <h3 className="font-semibold">
+            Investition deiner Kombination{' '}
+            <span className="font-normal" style={{ color: 'var(--text-muted)' }}>
+              — {customResult.label}
+            </span>
+          </h3>
+          <dl className="tabular mt-2 max-w-md space-y-1">
+            {customResult.capexItems.map((it) => (
+              <div key={it.key} className="flex items-baseline justify-between gap-2">
+                <dt style={{ color: 'var(--text-secondary)' }}>
+                  {it.label}
+                  {it.overridden && (
+                    <span className="ml-1.5 rounded-full px-1.5 text-xs font-medium text-white" style={{ background: CUSTOM_COLOR[mode] }}>
+                      Angebot
+                    </span>
+                  )}
+                </dt>
+                <dd>{fmtEur(it.eur)}</dd>
+              </div>
+            ))}
+            <div className="flex items-baseline justify-between gap-2" style={{ color: 'var(--good-text)' }}>
+              <dt>Förderung (KfW 458)</dt>
+              <dd>{customResult.subsidy > 0 ? `− ${fmtEur(customResult.subsidy)}` : '–'}</dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-2 border-t pt-1 font-semibold" style={{ borderColor: 'var(--baseline)' }}>
+              <dt>Eigenanteil</dt>
+              <dd>{fmtEur(customResult.capexNet)}</dd>
+            </div>
+          </dl>
+        </div>
+      )}
+
+      <details className="card no-print p-0">
+        <summary className="cursor-pointer select-none p-4 text-sm font-semibold">📊 Datenbasis der Rechnung</summary>
+        <div className="px-5 pb-5 text-sm">
+          <ul className="list-disc space-y-1 pl-5" style={{ color: 'var(--text-secondary)' }}>
             <li>Strom: {inv.power.consumptionKwh.toLocaleString('de-DE')} kWh/a zu {inv.power.pricePerKwhCt.toLocaleString('de-DE')} ct/kWh — aus Zählerständen und aktuellem Vertrag</li>
             <li>Wärme: {inv.heat.sterPerYear} Ster/a à {fmtEur(inv.heat.eurPerSter)} — aus den Forstbetrieb-Rechnungen; entspricht{' '}
               {bundle.settings.house.heatedAreaM2
@@ -304,6 +544,8 @@ export function Invest() {
                 : 'n/a'}{' '}
               — plausibel für teilsanierten Altbau</li>
             <li>Gebäude: Bj. 1889, EG unsaniert (1 m Bruchstein), DG 1998 isoliert → WP mit JAZ {inv.scenarios.heatPump.jaz} (+Struktur-Effekt) konservativ gerechnet</li>
+            <li>Speicher: {s.battery.cyclesPerYear} Vollzyklen/a, {Math.round((1 - s.battery.efficiency) * 100)} % Verluste — verschiebt Überschuss in den Eigenverbrauch</li>
+            <li>Klimaanlage: reiner Komfortbaustein ({s.klima.kwhPerYear} kWh/a Kühlstrom, {s.klima.pvCoverPct} % PV-gedeckt) — kostet, spart nichts</li>
             <li>Eigenarbeit: {inv.heat.ownWorkHoursPerYear} h/a à {fmtEur(inv.heat.ownWorkEurPerHour)} — macht „mehr Komfort" vergleichbar</li>
           </ul>
           <p className="mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -312,17 +554,18 @@ export function Invest() {
             <code>data/investment.json</code>.
           </p>
         </div>
-        <div className="card p-5 text-sm">
-          <h3 className="font-semibold">Förderung (eingerechnet)</h3>
-          <p className="mt-2" style={{ color: 'var(--text-secondary)' }}>
-            {inv.subsidyNote}
-          </p>
+      </details>
+
+      <details className="card no-print p-0">
+        <summary className="cursor-pointer select-none p-4 text-sm font-semibold">🏛 Förderung (eingerechnet)</summary>
+        <div className="px-5 pb-5 text-sm">
+          <p style={{ color: 'var(--text-secondary)' }}>{inv.subsidyNote}</p>
           <p className="mt-3 text-xs" style={{ color: 'var(--critical)' }}>
             ⏳ Der 16-%-Klimageschwindigkeitsbonus sinkt ab Februar 2027 halbjährlich — bei der Heizung
             kostet Warten bares Geld.
           </p>
         </div>
-      </div>
+      </details>
     </div>
   )
 }

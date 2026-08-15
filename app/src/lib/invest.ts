@@ -1,9 +1,9 @@
 import type { InvestmentSettings, Tier } from './schema'
 
 /**
- * Investitionsrechnung als Baukasten: Waermeerzeuger x PV-Groesse x
- * Warmwasser-System sind frei kombinierbar; jede Kombination wird ueber
- * den Planungshorizont durchgerechnet.
+ * Investitionsrechnung als Baukasten: Waermeerzeuger x PV-Groesse x Speicher x
+ * Warmwasser-System x Klimaanlage sind frei kombinierbar; jede Kombination
+ * wird ueber den Planungshorizont durchgerechnet.
  *
  * Sichten:
  * - Kumulierte Gesamtkosten (CAPEX netto in Jahr 0, dann Betriebskosten
@@ -14,6 +14,10 @@ import type { InvestmentSettings, Tier } from './schema'
  * an Planung/Einbau -> hoehere Wartungs-/Reparaturkosten und bei der WP
  * schlechtere JAZ; Premium umgekehrt. Der Status quo bekommt bewusst
  * KEINE fiktive Ersatzinvestition (wird als Hinweis ausgewiesen).
+ *
+ * PriceOverrides: jeder CAPEX-Einzelposten kann mit dem Preis eines echten
+ * Angebots ueberschrieben werden (Regler im UI); ohne Override gilt der
+ * Marktwert der gewaehlten Kostenstruktur.
  */
 
 export type HeatKey = 'bestand' | 'woodNew' | 'pellet' | 'heatPump'
@@ -22,7 +26,21 @@ export type WwKey = 'bestand' | 'bwwp' | 'heizstab'
 export interface Combo {
   heat: HeatKey
   pvKwp: number
+  /** nur wirksam mit PV > 0 */
+  batteryKwh: number
   ww: WwKey
+  /** Multisplit fuer die Schlafzimmer im OG — reiner Komfortbaustein */
+  klima: boolean
+}
+
+/** Angebotspreise, die die Marktwerte der Kostenstruktur ersetzen */
+export interface PriceOverrides {
+  heatCapexEur?: number
+  pvEurPerKwp?: number
+  batteryEurPerKwh?: number
+  wwCapexEur?: number
+  klimaCapexEur?: number
+  elektroCapexEur?: number
 }
 
 export const HEAT_LABEL: Record<HeatKey, string> = {
@@ -38,13 +56,16 @@ export const WW_LABEL: Record<WwKey, string> = {
   heizstab: 'Heizstab',
 }
 
-export const comboKey = (c: Combo): string => `${c.heat}|${c.pvKwp}|${c.ww}`
+export const comboKey = (c: Combo): string =>
+  `${c.heat}|${c.pvKwp}|${c.pvKwp > 0 ? c.batteryKwh : 0}|${c.ww}|${c.klima ? 'K' : '-'}`
 
 export function comboLabel(c: Combo): string {
   const parts: string[] = [HEAT_LABEL[c.heat]]
   if (c.pvKwp > 0) parts.push(`PV ${c.pvKwp} kWp`)
+  if (c.pvKwp > 0 && c.batteryKwh > 0) parts.push(`Speicher ${c.batteryKwh} kWh`)
   if (c.ww !== 'bestand') parts.push(WW_LABEL[c.ww])
-  if (c.heat === 'bestand' && c.pvKwp === 0 && c.ww === 'bestand') return 'Weiter wie bisher'
+  if (c.klima) parts.push('Klima')
+  if (c.heat === 'bestand' && c.pvKwp === 0 && c.ww === 'bestand' && !c.klima) return 'Weiter wie bisher'
   return parts.join(' + ')
 }
 
@@ -55,6 +76,13 @@ export interface CostBreakdown {
   eigenarbeit: number
 }
 
+export interface CapexItem {
+  key: keyof PriceOverrides
+  label: string
+  eur: number
+  overridden: boolean
+}
+
 export interface ComboResult {
   combo: Combo
   key: string
@@ -62,6 +90,8 @@ export interface ComboResult {
   capexGross: number
   subsidy: number
   capexNet: number
+  /** Einzelposten der Investition (fuer die Regler-Anzeige) */
+  capexItems: CapexItem[]
   cumulative: number[]
   breakEvenYear: number | null
   horizonSavings: number
@@ -78,7 +108,12 @@ const annuityFactor = (ratePct: number, years: number): number => {
   return (r * Math.pow(1 + r, years)) / (Math.pow(1 + r, years) - 1)
 }
 
-export function computeCombo(inv: InvestmentSettings, tier: Tier, combo: Combo): ComboResult {
+export function computeCombo(
+  inv: InvestmentSettings,
+  tier: Tier,
+  combo: Combo,
+  ov: PriceOverrides = {},
+): ComboResult {
   const H = inv.horizonYears
   const af = annuityFactor(inv.interestRatePct, H)
   const h = inv.heat
@@ -87,6 +122,7 @@ export function computeCombo(inv: InvestmentSettings, tier: Tier, combo: Combo):
   const mf = fx.maintenanceFactor[tier]
   const stromCt = inv.power.pricePerKwhCt
   const feedCt = s.pv.feedInCtPerKwh
+  const battKwh = combo.pvKwp > 0 ? combo.batteryKwh : 0
 
   const usefulHeatKwh = h.sterPerYear * h.kwhPerSter * h.oldBoilerEfficiency
 
@@ -105,23 +141,39 @@ export function computeCombo(inv: InvestmentSettings, tier: Tier, combo: Combo):
   const wpFromPvKwh =
     combo.heat === 'heatPump' && combo.pvKwp > 0 ? wpStromKwh * (s.pvHeatPump.wpPvCoverPct / 100) : 0
 
-  // --- PV ------------------------------------------------------------------
-  const pvCapex = combo.pvKwp * s.pv.capexPerKwp[tier]
+  // --- Klimaanlage (Komfort) ----------------------------------------------
+  const klimaKwh = combo.klima ? s.klima.kwhPerYear : 0
+  const klimaPvKwh = combo.klima && combo.pvKwp > 0 ? klimaKwh * (s.klima.pvCoverPct / 100) : 0
+
+  // --- PV + Speicher -------------------------------------------------------
+  const pvPerKwp = ov.pvEurPerKwp ?? s.pv.capexPerKwp[tier]
+  const pvCapex = combo.pvKwp * pvPerKwp
+  const battCapex = battKwh * (ov.batteryEurPerKwh ?? s.battery.capexPerKwh[tier])
   /**
    * PV-Jahreswert (negativ = Ertrag): Eigenverbrauch zu Netzpreis,
-   * Ueberschuss zu Einspeisung. `divertedKwh` (WW-Strom aus Ueberschuss)
-   * verlaesst die Einspeisung ohne Gutschrift — seine Kosten sind die
-   * entgangene Verguetung und werden beim WW-Baustein angesetzt.
+   * Ueberschuss zu Einspeisung. `divertedKwh` (WW-/Klima-Strom aus
+   * Ueberschuss) verlaesst die Einspeisung ohne Gutschrift — seine Kosten
+   * sind die entgangene Verguetung und werden beim jeweiligen Baustein
+   * angesetzt. Der Speicher verschiebt weiteren Ueberschuss in den
+   * Eigenverbrauch (Zyklen- und Verlust-begrenzt).
    */
   const pvEnergy = (y: number, extraSelfKwh: number, divertedKwh: number): number => {
     if (combo.pvKwp === 0) return 0
     const gen = combo.pvKwp * s.pv.specificYieldKwhPerKwp * Math.pow(1 - s.pv.degradationPctPerYear / 100, y)
     const baseSelf = Math.min(gen * (s.pv.selfConsumptionPct / 100), inv.power.consumptionKwh)
     const self = Math.min(baseSelf + extraSelfKwh, gen)
-    const feedIn = Math.max(gen - self - divertedKwh, 0)
+    let surplus = Math.max(gen - self - divertedKwh, 0)
+    const remainingGridKwh = Math.max(inv.power.consumptionKwh - baseSelf, 0)
+    const battIn = Math.min(
+      (battKwh * s.battery.cyclesPerYear) / s.battery.efficiency,
+      surplus,
+      remainingGridKwh / s.battery.efficiency,
+    )
+    const battOut = battIn * s.battery.efficiency
+    surplus -= battIn
     const priceCt = esc(stromCt, inv.escalationPct.strom, y)
     const fCt = esc(feedCt, inv.escalationPct.einspeisung, y)
-    return -(self * priceCt + feedIn * fCt) / 100
+    return -((self + battOut) * priceCt + surplus * fCt) / 100
   }
   const pvOm = (y: number): number =>
     combo.pvKwp === 0
@@ -130,18 +182,27 @@ export function computeCombo(inv: InvestmentSettings, tier: Tier, combo: Combo):
         (y + 1 === s.pv.inverterReplaceYear ? s.pv.inverterCostEur : 0)
 
   // --- CAPEX + Foerderung --------------------------------------------------
-  let capexGross = pvCapex + (wwSpec?.capexEur ?? 0)
-  let subsidy = 0
-  const addHeatCapex = (capex: number, pct: number, cap: number, extra: number) => {
-    capexGross += capex
-    subsidy += Math.min(capex, cap) * (pct / 100) + extra
+  const items: CapexItem[] = []
+  const addItem = (key: keyof PriceOverrides, label: string, eur: number) => {
+    if (eur > 0) items.push({ key, label, eur, overridden: ov[key] !== undefined })
   }
-  if (combo.heat === 'woodNew')
-    addHeatCapex(s.woodNew.capexEur[tier], s.woodNew.subsidyPct, s.woodNew.subsidyCapEur, s.woodNew.subsidyExtraEur)
-  if (combo.heat === 'pellet')
-    addHeatCapex(s.pellet.capexEur[tier], s.pellet.subsidyPct, s.pellet.subsidyCapEur, s.pellet.subsidyExtraEur)
-  if (combo.heat === 'heatPump')
-    addHeatCapex(s.heatPump.capexEur[tier], s.heatPump.subsidyPct, s.heatPump.subsidyCapEur, s.heatPump.subsidyExtraEur)
+  let subsidy = 0
+  const heatSpec =
+    combo.heat === 'woodNew' ? s.woodNew : combo.heat === 'pellet' ? s.pellet : combo.heat === 'heatPump' ? s.heatPump : null
+  if (heatSpec) {
+    const capex = ov.heatCapexEur ?? heatSpec.capexEur[tier]
+    addItem('heatCapexEur', heatSpec.label, capex)
+    subsidy += Math.min(capex, heatSpec.subsidyCapEur) * (heatSpec.subsidyPct / 100) + heatSpec.subsidyExtraEur
+  }
+  addItem('pvEurPerKwp', `${s.pv.label} ${combo.pvKwp} kWp`, pvCapex)
+  addItem('batteryEurPerKwh', `${s.battery.label} ${battKwh} kWh`, battCapex)
+  if (wwSpec) addItem('wwCapexEur', WW_LABEL[combo.ww], ov.wwCapexEur ?? wwSpec.capexEur)
+  if (combo.klima) addItem('klimaCapexEur', s.klima.label, ov.klimaCapexEur ?? s.klima.capexEur[tier])
+  /** Zaehlerschrank & Co. — einmal, sobald irgendein Elektro-Baustein kommt */
+  const needsElektro = combo.pvKwp > 0 || combo.heat === 'heatPump' || battKwh > 0 || combo.klima
+  if (needsElektro) addItem('elektroCapexEur', s.elektro.label, ov.elektroCapexEur ?? s.elektro.capexEur[tier])
+
+  const capexGross = items.reduce((sum, i) => sum + i.eur, 0)
   const capexNet = capexGross - subsidy
 
   // --- Jahreskosten --------------------------------------------------------
@@ -178,7 +239,13 @@ export function computeCombo(inv: InvestmentSettings, tier: Tier, combo: Combo):
       const ct = combo.pvKwp > 0 ? esc(feedCt, inv.escalationPct.einspeisung, y) : priceCt
       energie += (wwStromKwh * ct) / 100
     }
-    energie += pvEnergy(y, wpFromPvKwh, wwSpec && combo.pvKwp > 0 ? wwStromKwh : 0)
+    if (combo.klima) {
+      // PV-gedeckter Kuehlstrom zu Opportunitaetskosten, Rest aus dem Netz
+      const fCt = esc(feedCt, inv.escalationPct.einspeisung, y)
+      energie += (klimaPvKwh * fCt + (klimaKwh - klimaPvKwh) * priceCt) / 100
+      betrieb += s.klima.maintenanceEur * mf
+    }
+    energie += pvEnergy(y, wpFromPvKwh, (wwSpec && combo.pvKwp > 0 ? wwStromKwh : 0) + klimaPvKwh)
     betrieb += pvOm(y)
 
     return { kapital: 0, energie, betrieb, eigenarbeit }
@@ -201,6 +268,7 @@ export function computeCombo(inv: InvestmentSettings, tier: Tier, combo: Combo):
     capexGross,
     subsidy,
     capexNet,
+    capexItems: items,
     cumulative,
     breakEvenYear: null,
     horizonSavings: 0,
@@ -209,16 +277,16 @@ export function computeCombo(inv: InvestmentSettings, tier: Tier, combo: Combo):
   }
 }
 
-export const STATUS_QUO: Combo = { heat: 'bestand', pvKwp: 0, ww: 'bestand' }
+export const STATUS_QUO: Combo = { heat: 'bestand', pvKwp: 0, batteryKwh: 0, ww: 'bestand', klima: false }
 
 /** kuratierte Vergleichs-Kombinationen */
 export const PRESETS: Combo[] = [
-  { heat: 'woodNew', pvKwp: 0, ww: 'bestand' },
-  { heat: 'pellet', pvKwp: 0, ww: 'bestand' },
-  { heat: 'heatPump', pvKwp: 0, ww: 'bestand' },
-  { heat: 'bestand', pvKwp: 15, ww: 'bestand' },
-  { heat: 'heatPump', pvKwp: 15, ww: 'bestand' },
-  { heat: 'pellet', pvKwp: 15, ww: 'bwwp' },
+  { heat: 'woodNew', pvKwp: 0, batteryKwh: 0, ww: 'bestand', klima: false },
+  { heat: 'pellet', pvKwp: 0, batteryKwh: 0, ww: 'bestand', klima: false },
+  { heat: 'heatPump', pvKwp: 0, batteryKwh: 0, ww: 'bestand', klima: false },
+  { heat: 'bestand', pvKwp: 15, batteryKwh: 0, ww: 'bestand', klima: false },
+  { heat: 'heatPump', pvKwp: 15, batteryKwh: 10, ww: 'bestand', klima: false },
+  { heat: 'pellet', pvKwp: 15, batteryKwh: 0, ww: 'bwwp', klima: false },
 ]
 
 /** Break-even und Horizont-Ersparnis relativ zum Status quo setzen */
