@@ -27,7 +27,10 @@ export function Overview() {
   const filteredTotal = cats.reduce((s, c) => s + summary.perCategory[c], 0)
   const filteredPrevTotal = cats.reduce((s, c) => s + prev.perCategory[c], 0)
   const avgPerMonth = summary.monthsWithData ? filteredTotal / summary.monthsWithData : 0
-  const deltaPct = filteredPrevTotal > 0 ? ((filteredTotal - filteredPrevTotal) / filteredPrevTotal) * 100 : undefined
+  // Vergleich auf Ø/Monat-Basis — Jahressummen wuerden bei unvollstaendigen
+  // Jahren (z. B. Datenbeginn im September) massiv fehlleiten
+  const prevAvg = prev.monthsWithData ? filteredPrevTotal / prev.monthsWithData : 0
+  const deltaPct = prevAvg > 0 ? ((avgPerMonth - prevAvg) / prevAvg) * 100 : undefined
 
   // Strom-KPIs aus Abrechnungen (Preis) und Zaehlerstaenden (Verbrauch)
   const stromPrice = useMemo(() => {
@@ -112,22 +115,31 @@ export function Overview() {
       return rec ? Math.round(cats.reduce((s, c) => s + rec[c], 0) * 100) / 100 : null
     })
     const isSel = y === year
+    // Direktes Label am letzten belegten Punkt — endLabel rechnet bei
+    // Null-Monaten am Serienende mit NaN-Koordinaten
+    let lastIdx = -1
+    for (let i = totals.length - 1; i >= 0; i--) if (totals[i] !== null) { lastIdx = i; break }
     return {
       name: String(y),
       type: 'line' as const,
-      data: totals,
+      data: totals.map((v, i) => ({
+        value: v,
+        label:
+          i === lastIdx
+            ? {
+                show: true,
+                position: 'right' as const,
+                color: isSel ? t.textPrimary : t.textMuted,
+                fontSize: 11,
+                formatter: () => String(y),
+              }
+            : undefined,
+      })),
       lineStyle: { width: 2, color: isSel ? t.accent : deEmphasis(mode) },
       itemStyle: { color: isSel ? t.accent : deEmphasis(mode), borderColor: t.surface, borderWidth: 2 },
       symbol: 'circle',
       symbolSize: 8,
       showSymbol: false,
-      endLabel: {
-        show: true,
-        color: isSel ? t.textPrimary : t.textMuted,
-        fontSize: 11,
-        formatter: '{a}',
-        distance: 6,
-      },
       z: isSel ? 3 : 2,
     }
   })

@@ -1,10 +1,9 @@
 [
-  { "id": "r-strom-2024-01", "meter": "strom", "date": "2024-01-01", "value": 41200, "unit": "kWh", "demo": true },
-  { "id": "r-strom-2025-01", "meter": "strom", "date": "2025-01-01", "value": 44600, "unit": "kWh", "demo": true },
-  { "id": "r-strom-2026-01", "meter": "strom", "date": "2026-01-01", "value": 48080, "unit": "kWh", "demo": true },
-  { "id": "r-strom-2026-08", "meter": "strom", "date": "2026-08-01", "value": 50010, "unit": "kWh", "demo": true },
-  { "id": "r-wasser-2024-01", "meter": "wasser", "date": "2024-01-01", "value": 1610, "unit": "m3", "demo": true },
-  { "id": "r-wasser-2025-01", "meter": "wasser", "date": "2025-01-01", "value": 1755, "unit": "m3", "demo": true },
-  { "id": "r-wasser-2026-01", "meter": "wasser", "date": "2026-01-01", "value": 1893, "unit": "m3", "demo": true },
-  { "id": "r-wasser-2026-08", "meter": "wasser", "date": "2026-08-01", "value": 1971, "unit": "m3", "demo": true }
+  { "id": "r-strom-alt-2025-09-01", "meter": "strom-alt", "type": "strom", "date": "2025-09-01", "value": 69626, "unit": "kWh" },
+  { "id": "r-strom-alt-2025-09-30", "meter": "strom-alt", "type": "strom", "date": "2025-09-30", "value": 70508, "unit": "kWh" },
+  { "id": "r-strom-alt-2025-10-07", "meter": "strom-alt", "type": "strom", "date": "2025-10-07", "value": 70715, "unit": "kWh" },
+  { "id": "r-strom-neu-2025-10-08", "meter": "strom-neu", "type": "strom", "date": "2025-10-08", "value": 0, "unit": "kWh" },
+  { "id": "r-strom-neu-2025-10-14", "meter": "strom-neu", "type": "strom", "date": "2025-10-14", "value": 218, "unit": "kWh" },
+  { "id": "r-strom-neu-2025-10-31", "meter": "strom-neu", "type": "strom", "date": "2025-10-31", "value": 757, "unit": "kWh" },
+  { "id": "r-strom-neu-2025-11-27", "meter": "strom-neu", "type": "strom", "date": "2025-11-27", "value": 1719, "unit": "kWh" }
 ]

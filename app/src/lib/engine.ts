@@ -135,38 +135,57 @@ export interface YearlyConsumption {
   complete: boolean
 }
 
-export function yearlyConsumption(readings: Reading[], meter: Reading['meter']): YearlyConsumption[] {
-  const rs = readings
-    .filter((r) => r.meter === meter)
-    .sort((a, b) => a.date.localeCompare(b.date))
-  if (rs.length < 2) return []
+/**
+ * Jahresverbrauch je Zaehlertyp: pro Zaehler wird zwischen Ablesungen linear
+ * interpoliert und der Anteil je Kalenderjahr summiert. Mehrere Zaehler
+ * desselben Typs (Zaehlertausch!) werden addiert; `complete` ist ein Jahr
+ * erst, wenn die Ablesungen es lueckenlos abdecken.
+ */
+export function yearlyConsumption(readings: Reading[], type: Reading['type']): YearlyConsumption[] {
+  const byMeter = new Map<string, Reading[]>()
+  for (const r of readings) {
+    if (r.type !== type) continue
+    const list = byMeter.get(r.meter) ?? []
+    list.push(r)
+    byMeter.set(r.meter, list)
+  }
 
-  const interp = (day: number): number | null => {
+  const perYear = new Map<number, { value: number; coveredDays: number }>()
+  for (const list of byMeter.values()) {
+    const rs = [...list].sort((a, b) => a.date.localeCompare(b.date))
+    if (rs.length < 2) continue
     const first = toDay(rs[0].date)
     const last = toDay(rs[rs.length - 1].date)
-    if (day < first || day > last) return null
-    for (let i = 1; i < rs.length; i++) {
-      const a = toDay(rs[i - 1].date)
-      const b = toDay(rs[i].date)
-      if (day >= a && day <= b) {
-        const t = b === a ? 0 : (day - a) / (b - a)
-        return rs[i - 1].value + t * (rs[i].value - rs[i - 1].value)
+    const interp = (day: number): number => {
+      for (let i = 1; i < rs.length; i++) {
+        const a = toDay(rs[i - 1].date)
+        const b = toDay(rs[i].date)
+        if (day >= a && day <= b) {
+          const t = b === a ? 0 : (day - a) / (b - a)
+          return rs[i - 1].value + t * (rs[i].value - rs[i - 1].value)
+        }
       }
+      return rs[rs.length - 1].value
     }
-    return null
+    const firstYear = dayToDate(first).getUTCFullYear()
+    const lastYear = dayToDate(last).getUTCFullYear()
+    for (let y = firstYear; y <= lastYear; y++) {
+      const a = Math.max(first, toDay(`${y}-01-01`))
+      const b = Math.min(last, toDay(`${y + 1}-01-01`))
+      if (b <= a) continue
+      const agg = perYear.get(y) ?? { value: 0, coveredDays: 0 }
+      agg.value += interp(b) - interp(a)
+      agg.coveredDays += b - a
+      perYear.set(y, agg)
+    }
   }
 
-  const out: YearlyConsumption[] = []
-  const firstYear = new Date(rs[0].date).getUTCFullYear()
-  const lastYear = new Date(rs[rs.length - 1].date).getUTCFullYear()
-  for (let y = firstYear; y <= lastYear; y++) {
-    const start = interp(toDay(`${y}-01-01`))
-    const endExact = interp(toDay(`${y + 1}-01-01`))
-    const end = endExact ?? rs[rs.length - 1].value
-    if (start === null) continue
-    out.push({ year: y, value: end - start, complete: endExact !== null })
-  }
-  return out
+  return [...perYear.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([year, agg]) => {
+      const daysInYear = toDay(`${year + 1}-01-01`) - toDay(`${year}-01-01`)
+      return { year, value: agg.value, complete: agg.coveredDays >= daysInYear }
+    })
 }
 
 // ---------------------------------------------------------------------------

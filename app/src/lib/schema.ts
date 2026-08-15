@@ -80,7 +80,13 @@ export type Invoice = z.infer<typeof invoiceSchema>
 
 export const readingSchema = z.object({
   id: z.string().min(1),
-  meter: z.enum(['strom', 'wasser']),
+  /**
+   * Frei benennbarer Zaehler (z. B. "strom-alt", "strom-neu"). Bei
+   * Zaehlertausch bekommt der neue Zaehler einen neuen Namen — Staende je
+   * Zaehler muessen monoton steigen, der Verbrauch wird je Typ summiert.
+   */
+  meter: z.string().min(1),
+  type: z.enum(['strom', 'wasser']),
   date: isoDate,
   value: z.number().nonnegative(),
   unit: z.enum(['kWh', 'm3']),

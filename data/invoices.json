@@ -1,29 +1,28 @@
 [
-  { "id": "2024-strom-abschlag", "category": "strom", "kind": "abschlag", "vendor": "Stadtwerke (Demo)", "date": "2024-01-01", "periodStart": "2024-01-01", "periodEnd": "2024-12-31", "amountEur": 1140, "note": "Abschlaege 12 x 95 EUR (Demo)", "demo": true },
-  { "id": "2024-strom-jab", "category": "strom", "kind": "abrechnung", "vendor": "Stadtwerke (Demo)", "date": "2025-03-10", "periodStart": "2024-01-01", "periodEnd": "2024-12-31", "amountEur": 1182.4, "quantity": 3400, "unit": "kWh", "note": "Jahresabrechnung 2024 (Demo)", "demo": true },
-  { "id": "2025-strom-abschlag", "category": "strom", "kind": "abschlag", "vendor": "Stadtwerke (Demo)", "date": "2025-01-01", "periodStart": "2025-01-01", "periodEnd": "2025-12-31", "amountEur": 1200, "note": "Abschlaege 12 x 100 EUR (Demo)", "demo": true },
-  { "id": "2025-strom-jab", "category": "strom", "kind": "abrechnung", "vendor": "Stadtwerke (Demo)", "date": "2026-03-12", "periodStart": "2025-01-01", "periodEnd": "2025-12-31", "amountEur": 1216.8, "quantity": 3480, "unit": "kWh", "note": "Jahresabrechnung 2025 (Demo)", "demo": true },
-  { "id": "2026-strom-abschlag", "category": "strom", "kind": "abschlag", "vendor": "Stadtwerke (Demo)", "date": "2026-01-01", "periodStart": "2026-01-01", "periodEnd": "2026-12-31", "amountEur": 1260, "note": "Abschlaege 12 x 105 EUR (Demo)", "demo": true },
-
-  { "id": "2024-wasser-jab", "category": "wasser", "kind": "abrechnung", "vendor": "Gemeindewerke (Demo)", "date": "2025-01-20", "periodStart": "2024-01-01", "periodEnd": "2024-12-31", "amountEur": 322.5, "quantity": 145, "unit": "m3", "note": "Jahresabrechnung Frischwasser 2024 (Demo)", "demo": true },
-  { "id": "2025-wasser-jab", "category": "wasser", "kind": "abrechnung", "vendor": "Gemeindewerke (Demo)", "date": "2026-01-18", "periodStart": "2025-01-01", "periodEnd": "2025-12-31", "amountEur": 310.2, "quantity": 138, "unit": "m3", "note": "Jahresabrechnung Frischwasser 2025 (Demo)", "demo": true },
-  { "id": "2026-wasser-abschlag", "category": "wasser", "kind": "abschlag", "vendor": "Gemeindewerke (Demo)", "date": "2026-01-01", "periodStart": "2026-01-01", "periodEnd": "2026-12-31", "amountEur": 320, "note": "Abschlaege 4 x 80 EUR (Demo)", "demo": true },
-
-  { "id": "2024-abwasser", "category": "abwasser", "kind": "abrechnung", "vendor": "Gemeinde (Demo)", "date": "2025-01-20", "periodStart": "2024-01-01", "periodEnd": "2024-12-31", "amountEur": 412, "quantity": 145, "unit": "m3", "note": "Abwassergebuehrenbescheid 2024 (Demo)", "demo": true },
-  { "id": "2025-abwasser", "category": "abwasser", "kind": "abrechnung", "vendor": "Gemeinde (Demo)", "date": "2026-01-18", "periodStart": "2025-01-01", "periodEnd": "2025-12-31", "amountEur": 398, "quantity": 138, "unit": "m3", "note": "Abwassergebuehrenbescheid 2025 (Demo)", "demo": true },
-  { "id": "2026-abwasser-abschlag", "category": "abwasser", "kind": "abschlag", "vendor": "Gemeinde (Demo)", "date": "2026-01-01", "periodStart": "2026-01-01", "periodEnd": "2026-12-31", "amountEur": 400, "note": "Abschlaege (Demo)", "demo": true },
-
-  { "id": "2024-holz", "category": "holz", "kind": "einkauf", "vendor": "Forstbetrieb (Demo)", "date": "2024-05-14", "amountEur": 880, "quantity": 8, "unit": "ster", "note": "8 Ster Buche, ofenfertig (Demo)", "demo": true },
-  { "id": "2025-holz", "category": "holz", "kind": "einkauf", "vendor": "Forstbetrieb (Demo)", "date": "2025-06-02", "amountEur": 840, "quantity": 8, "unit": "ster", "note": "8 Ster Buche (Demo)", "demo": true },
-  { "id": "2026-holz", "category": "holz", "kind": "einkauf", "vendor": "Forstbetrieb (Demo)", "date": "2026-07-10", "amountEur": 660, "quantity": 6, "unit": "ster", "note": "6 Ster Buche (Demo)", "demo": true },
-
-  { "id": "2024-kaminkehrer-1", "category": "kaminkehrer", "kind": "einzel", "vendor": "Kaminkehrer (Demo)", "date": "2024-04-08", "amountEur": 68.4, "note": "Kehrung + Messung (Demo)", "demo": true },
-  { "id": "2024-kaminkehrer-2", "category": "kaminkehrer", "kind": "einzel", "vendor": "Kaminkehrer (Demo)", "date": "2024-10-15", "amountEur": 62.1, "note": "Kehrung (Demo)", "demo": true },
-  { "id": "2025-kaminkehrer-1", "category": "kaminkehrer", "kind": "einzel", "vendor": "Kaminkehrer (Demo)", "date": "2025-04-11", "amountEur": 71.2, "note": "Kehrung + Feuerstaettenschau (Demo)", "demo": true },
-  { "id": "2025-kaminkehrer-2", "category": "kaminkehrer", "kind": "einzel", "vendor": "Kaminkehrer (Demo)", "date": "2025-10-20", "amountEur": 63.5, "note": "Kehrung (Demo)", "demo": true },
-  { "id": "2026-kaminkehrer-1", "category": "kaminkehrer", "kind": "einzel", "vendor": "Kaminkehrer (Demo)", "date": "2026-04-09", "amountEur": 72.8, "note": "Kehrung + Messung (Demo)", "demo": true },
-
-  { "id": "2024-wartung", "category": "wartung", "kind": "einzel", "vendor": "Heizungsbau (Demo)", "date": "2024-10-02", "amountEur": 185, "note": "Wartung Holzvergaser + Solarthermie (Demo)", "demo": true },
-  { "id": "2025-wartung", "category": "wartung", "kind": "einzel", "vendor": "Heizungsbau (Demo)", "date": "2025-09-29", "amountEur": 195, "note": "Wartung, Tauschteil Kesselfuehler (Demo)", "demo": true },
-  { "id": "2025-wartung-2", "category": "wartung", "kind": "einzel", "vendor": "Heizungsbau (Demo)", "date": "2025-12-05", "amountEur": 340, "note": "Reparatur Umwaelzpumpe (Demo)", "demo": true }
+  {
+    "id": "2025-strom-badenova-schlussabrechnung",
+    "category": "strom",
+    "kind": "abrechnung",
+    "vendor": "badenova Energie",
+    "date": "2025-12-03",
+    "periodStart": "2025-09-01",
+    "periodEnd": "2025-11-27",
+    "amountEur": 1040.35,
+    "quantity": 2808,
+    "unit": "kWh",
+    "note": "Schlussabrechnung Oekostrom PUR Ersatzversorgung (37,0 ct/kWh brutto). Vertrag gekuendigt zum 27.11.2025, inkl. Zaehlertausch Anfang Oktober.",
+    "sourceFile": "2025-12-03 0_Lieferanten Ihre Schlussabrechnung für Strom.pdf"
+  },
+  {
+    "id": "2026-strom-schwarzwald-abschlaege",
+    "category": "strom",
+    "kind": "abschlag",
+    "vendor": "schwarzwald energy",
+    "date": "2025-12-11",
+    "periodStart": "2025-11-28",
+    "periodEnd": "2026-11-27",
+    "amountEur": 2761,
+    "note": "Tarif 'schwarzwald strom flex - IMS' ab 28.11.2025. 11 Abschlaege a 251 EUR brutto (faellig 25.01.-25.11.2026). Korrigiertes Begruessungsschreiben vom 11.12.2025 ersetzt das vom 10.12.2025 (dort fehlerhaft 13 EUR).",
+    "sourceFile": "2025-12-11 0_Lieferanten Begrüßungsschreiben.pdf"
+  }
 ]
