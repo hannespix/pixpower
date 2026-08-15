@@ -1,5 +1,5 @@
 import type { Category, DataBundle, Invoice, Reading, Settings } from './schema'
-import { CATEGORIES } from './schema'
+import { CATEGORIES, CATEGORY_LABEL } from './schema'
 
 /**
  * Periodisierungs-Engine.
@@ -23,10 +23,28 @@ const HEATING_CATEGORIES: ReadonlySet<Category> = new Set(['holz'])
 export type MonthKey = string // "YYYY-MM"
 
 export interface MonthlyCosts {
-  /** Monat -> Kategorie -> periodisierte Kosten in EUR */
+  /** Monat -> Kategorie -> periodisierte Kosten in EUR (belegt) */
   months: Map<MonthKey, Record<Category, number>>
-  /** sortierte Liste aller Monate mit Daten */
+  /**
+   * Monat -> Kategorie -> geschaetzte Kosten fuer Beleg-Luecken.
+   * Nur Luecken INNERHALB der belegten Spanne einer Kategorie werden
+   * gefuellt (keine Extrapolation), mit dem Tagessatz der angrenzenden
+   * belegten Zeitraeume (linear interpoliert, bei Waerme HDD-gewichtet).
+   */
+  estimated: Map<MonthKey, Record<Category, number>>
+  /** sortierte Liste aller Monate mit Daten (belegt oder geschaetzt) */
   keys: MonthKey[]
+  /** erkannte Beleg-Luecken (Basis der Schaetzung und der Daten-Wunschliste) */
+  gaps: GapInfo[]
+}
+
+export interface GapInfo {
+  category: Category
+  /** ISO-Daten der Luecke (inklusive) */
+  start: string
+  end: string
+  /** geschaetzte Kosten der Luecke */
+  estimatedEur: number
 }
 
 const toDay = (iso: string): number => Date.parse(iso + 'T00:00:00Z') / DAY_MS
@@ -91,6 +109,12 @@ function allocateInvoice(
   return out
 }
 
+const emptyRecord = (): Record<Category, number> =>
+  Object.fromEntries(CATEGORIES.map((c) => [c, 0])) as Record<Category, number>
+
+/** Kategorien mit laufendem Verbrauch — nur dort ist eine Beleg-Luecke ein Datenloch */
+const CONTINUOUS_CATEGORIES: readonly Category[] = ['strom', 'wasser', 'abwasser', 'holz']
+
 export function computeMonthlyCosts(bundle: DataBundle): MonthlyCosts {
   const { invoices, settings } = bundle
 
@@ -103,22 +127,112 @@ export function computeMonthlyCosts(bundle: DataBundle): MonthlyCosts {
     for (let d = toDay(inv.periodStart); d <= toDay(inv.periodEnd); d++) set.add(d)
   }
 
-  const months = new Map<MonthKey, Record<Category, number>>()
-  const emptyRecord = (): Record<Category, number> =>
-    Object.fromEntries(CATEGORIES.map((c) => [c, 0])) as Record<Category, number>
-
+  // Tagesgenaue Zuordnung je Kategorie — Basis fuer Monatswerte UND Luecken-Erkennung.
+  // Abdeckung zaehlt auch Tage, deren Abschlag durch eine Abrechnung verdraengt
+  // wurde (die Abrechnung deckt sie ja ab).
+  const perDay = new Map<Category, Map<number, number>>()
   for (const inv of invoices) {
     const covered = coveredByCategory.get(inv.category) ?? new Set<number>()
+    let dayMap = perDay.get(inv.category)
+    if (!dayMap) perDay.set(inv.category, (dayMap = new Map()))
     for (const [day, eur] of allocateInvoice(inv, settings, covered)) {
+      dayMap.set(day, (dayMap.get(day) ?? 0) + eur)
+    }
+  }
+  for (const [cat, set] of coveredByCategory) {
+    const dayMap = perDay.get(cat)!
+    for (const d of set) if (!dayMap.has(d)) dayMap.set(d, 0)
+  }
+
+  const months = new Map<MonthKey, Record<Category, number>>()
+  for (const [cat, dayMap] of perDay) {
+    for (const [day, eur] of dayMap) {
       const key = monthKeyOf(dayToDate(day))
       let rec = months.get(key)
       if (!rec) months.set(key, (rec = emptyRecord()))
-      rec[inv.category] += eur
+      rec[cat] += eur
     }
   }
 
-  const keys = [...months.keys()].sort()
-  return { months, keys }
+  const { estimated, gaps } = estimateGaps(perDay, settings)
+
+  const keys = [...new Set([...months.keys(), ...estimated.keys()])].sort()
+  return { months, estimated, keys, gaps }
+}
+
+/**
+ * Fuellt Beleg-Luecken innerhalb der belegten Spanne einer Kategorie.
+ *
+ * Fuer jede zusammenhaengende Luecke wird der Kostensatz (EUR je
+ * Gewichtseinheit: Tag bzw. HDD-Tagesgewicht bei Waerme) der angrenzenden
+ * belegten Zeitraeume ermittelt (Fenster bis 120 Tage) und ueber die Luecke
+ * linear interpoliert — Preisaenderungen vor/nach der Luecke fliessen so ein.
+ * Keine Extrapolation vor den ersten oder nach den letzten Beleg.
+ */
+function estimateGaps(
+  perDay: ReadonlyMap<Category, Map<number, number>>,
+  settings: Settings,
+): { estimated: Map<MonthKey, Record<Category, number>>; gaps: GapInfo[] } {
+  const estimated = new Map<MonthKey, Record<Category, number>>()
+  const gaps: GapInfo[] = []
+  const WINDOW = 120
+  const iso = (day: number): string => dayToDate(day).toISOString().slice(0, 10)
+
+  for (const cat of CONTINUOUS_CATEGORIES) {
+    const dayMap = perDay.get(cat)
+    if (!dayMap || dayMap.size < 2) continue
+    const heating = HEATING_CATEGORIES.has(cat)
+    const days = [...dayMap.keys()].sort((a, b) => a - b)
+    const first = days[0]
+    const last = days[days.length - 1]
+
+    const rateAround = (from: number, to: number): number | null => {
+      let cost = 0
+      let weight = 0
+      for (let d = from; d <= to; d++) {
+        const eur = dayMap.get(d)
+        if (eur === undefined) continue
+        cost += eur
+        weight += dayWeight(d, heating, settings)
+      }
+      return weight > 0 ? cost / weight : null
+    }
+
+    let gapStart: number | null = null
+    for (let d = first; d <= last + 1; d++) {
+      const isCovered = d <= last && dayMap.has(d)
+      if (!isCovered && d <= last) {
+        gapStart ??= d
+        continue
+      }
+      if (gapStart === null) continue
+      const a = gapStart
+      const b = d - 1
+      gapStart = null
+      const before = rateAround(a - WINDOW, a - 1)
+      const after = rateAround(b + 1, b + WINDOW)
+      if (before === null && after === null) continue
+      let gapEur = 0
+      for (let g = a; g <= b; g++) {
+        const t = (g - a + 0.5) / (b - a + 1)
+        const rate =
+          before !== null && after !== null ? before * (1 - t) + after * t : (before ?? after)!
+        const eur = rate * dayWeight(g, heating, settings)
+        if (eur <= 0) continue
+        gapEur += eur
+        const key = monthKeyOf(dayToDate(g))
+        let rec = estimated.get(key)
+        if (!rec) estimated.set(key, (rec = emptyRecord()))
+        rec[cat] += eur
+      }
+      // Mini-Luecken unter 14 Tagen sind Abrechnungs-Randeffekte, kein Datenloch
+      if (b - a + 1 >= 14 || gapEur > 50) {
+        gaps.push({ category: cat, start: iso(a), end: iso(b), estimatedEur: gapEur })
+      }
+    }
+  }
+  gaps.sort((x, y) => x.start.localeCompare(y.start))
+  return { estimated, gaps }
 }
 
 export const totalOfMonth = (rec: Record<Category, number>): number =>
@@ -196,30 +310,160 @@ export interface YearSummary {
   year: number
   total: number
   perCategory: Record<Category, number>
+  /** darin enthaltener geschaetzter Anteil */
+  estimatedTotal: number
   /** Anzahl Monate des Jahres mit zugeordneten Kosten */
   monthsWithData: number
   avgPerMonth: number
 }
 
-export function summarizeYear(mc: MonthlyCosts, year: number): YearSummary {
+export function summarizeYear(
+  mc: MonthlyCosts,
+  year: number,
+  includeEstimates = false,
+): YearSummary {
   const perCategory = Object.fromEntries(CATEGORIES.map((c) => [c, 0])) as Record<Category, number>
   let total = 0
+  let estimatedTotal = 0
   let monthsWithData = 0
   for (const key of mc.keys) {
     if (!key.startsWith(String(year))) continue
-    const rec = mc.months.get(key)!
-    const t = totalOfMonth(rec)
-    if (t > 0.005) monthsWithData++
-    total += t
-    for (const c of CATEGORIES) perCategory[c] += rec[c]
+    const rec = mc.months.get(key)
+    const est = includeEstimates ? mc.estimated.get(key) : undefined
+    let monthTotal = 0
+    for (const c of CATEGORIES) {
+      const v = (rec?.[c] ?? 0) + (est?.[c] ?? 0)
+      perCategory[c] += v
+      monthTotal += v
+      estimatedTotal += est?.[c] ?? 0
+    }
+    if (monthTotal > 0.005) monthsWithData++
+    total += monthTotal
   }
   return {
     year,
     total,
     perCategory,
+    estimatedTotal,
     monthsWithData,
     avgPerMonth: monthsWithData ? total / monthsWithData : 0,
   }
+}
+
+// ---------------------------------------------------------------------------
+// Datenqualitaet: was fehlt, was ist ueberfaellig — die "Wunschliste"
+// ---------------------------------------------------------------------------
+
+export interface QualityIssue {
+  severity: 'warning' | 'info'
+  category?: Category
+  title: string
+  detail: string
+  estimatedEur?: number
+}
+
+export function dataQualityIssues(
+  bundle: DataBundle,
+  mc: MonthlyCosts,
+  today: Date = new Date(),
+): QualityIssue[] {
+  const issues: QualityIssue[] = []
+  const todayDay = Math.floor(today.getTime() / DAY_MS)
+  const fmtDate = (isoStr: string) => new Date(isoStr).toLocaleDateString('de-DE')
+
+  // 1. Beleg-Luecken (werden geschaetzt, aber echte Belege sind besser)
+  for (const gap of mc.gaps) {
+    issues.push({
+      severity: 'warning',
+      category: gap.category,
+      title: `${CATEGORY_LABEL[gap.category]}: ${fmtDate(gap.start)} – ${fmtDate(gap.end)} unbelegt`,
+      detail:
+        `Für diesen Zeitraum liegt kein Beleg vor — er wird aus den angrenzenden ` +
+        `Zeiträumen geschätzt. Rechnung/Bescheid nachreichen ersetzt die Schätzung automatisch.`,
+      estimatedEur: gap.estimatedEur,
+    })
+  }
+
+  // 2. Abschlaege, deren Zeitraum laengst vorbei ist, ohne Jahresabrechnung
+  for (const inv of bundle.invoices) {
+    if (inv.kind !== 'abschlag' || !inv.periodEnd) continue
+    if (toDay(inv.periodEnd) + 60 > todayDay) continue
+    const covered = bundle.invoices.some(
+      (a) =>
+        a.kind === 'abrechnung' &&
+        a.category === inv.category &&
+        a.periodStart &&
+        a.periodEnd &&
+        a.periodStart <= inv.periodEnd! &&
+        a.periodEnd >= inv.periodEnd!,
+    )
+    if (!covered) {
+      issues.push({
+        severity: 'warning',
+        category: inv.category,
+        title: `${CATEGORY_LABEL[inv.category]}: Jahresabrechnung für ${fmtDate(inv.periodStart!)} – ${fmtDate(inv.periodEnd)} fehlt`,
+        detail:
+          `Bisher sind nur Abschläge (${fmtEur(inv.amountEur)}) erfasst. Die Abrechnung ` +
+          `korrigiert auf die echten Kosten und verdrängt die Abschläge automatisch.`,
+      })
+    }
+  }
+
+  // 3. Veraltete Zaehlerstaende
+  for (const type of ['strom', 'wasser'] as const) {
+    const rs = bundle.readings.filter((r) => r.type === type)
+    if (rs.length === 0) {
+      issues.push({
+        severity: 'info',
+        title: `${type === 'strom' ? 'Strom' : 'Wasser'}: keine Zählerstände erfasst`,
+        detail: 'Ein aktueller Zählerstand (Foto genügt) macht die Verbrauchs-KPIs möglich.',
+      })
+      continue
+    }
+    const lastDate = rs.map((r) => r.date).sort().at(-1)!
+    if (toDay(lastDate) + 180 < todayDay) {
+      issues.push({
+        severity: 'info',
+        title: `${type === 'strom' ? 'Stromzähler' : 'Wasserzähler'}: letzter Stand vom ${fmtDate(lastDate)}`,
+        detail: 'Ein aktueller Zählerstand verlängert die Verbrauchskurve bis heute (Foto genügt).',
+      })
+    }
+  }
+
+  // 4. Laufende Kategorien ohne aktuelle Belege (Abdeckung endet deutlich vor heute)
+  for (const cat of CONTINUOUS_CATEGORIES) {
+    const ends = bundle.invoices
+      .filter((i) => i.category === cat)
+      .map((i) =>
+        i.kind === 'einkauf'
+          ? addMonths(i.date, bundle.settings.woodSpreadMonths) - 1
+          : toDay(i.periodEnd ?? i.date),
+      )
+    if (ends.length === 0) continue
+    const lastCovered = Math.max(...ends)
+    if (lastCovered + 90 < todayDay) {
+      issues.push({
+        severity: 'warning',
+        category: cat,
+        title: `${CATEGORY_LABEL[cat]}: keine Belege seit ${fmtDate(dayToDate(lastCovered).toISOString().slice(0, 10))}`,
+        detail: 'Ab hier fehlen die laufenden Kosten komplett (keine Schätzung über den Datenrand hinaus).',
+      })
+    }
+  }
+
+  // 5. Kategorien ganz ohne Belege
+  for (const cat of ['wartung', 'kaminkehrer'] as const) {
+    if (!bundle.invoices.some((i) => i.category === cat)) {
+      issues.push({
+        severity: 'info',
+        category: cat,
+        title: `${CATEGORY_LABEL[cat]}: noch keine Belege`,
+        detail: 'Falls vorhanden, Rechnungen nachreichen — sonst fehlt diese Kategorie in der Gesamtsicht.',
+      })
+    }
+  }
+
+  return issues.sort((a, b) => (a.severity === b.severity ? 0 : a.severity === 'warning' ? -1 : 1))
 }
 
 export const yearsWithData = (mc: MonthlyCosts): number[] =>

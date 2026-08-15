@@ -1,9 +1,12 @@
+import { useMemo } from 'react'
 import { HashRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import { DataProvider, useData } from './state/DataProvider'
 import { Overview } from './views/Overview'
 import { Records } from './views/Records'
 import { Entry } from './views/Entry'
 import { Report } from './views/Report'
+import { Quality } from './views/Quality'
+import { dataQualityIssues } from './lib/engine'
 
 export default function App() {
   return (
@@ -16,7 +19,11 @@ export default function App() {
 }
 
 function Shell() {
-  const { bundle } = useData()
+  const { bundle, monthly } = useData()
+  const warningCount = useMemo(
+    () => dataQualityIssues(bundle, monthly).filter((i) => i.severity === 'warning').length,
+    [bundle, monthly],
+  )
   return (
     <div className="mx-auto max-w-6xl px-4 py-5">
       <header className="no-print mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -30,6 +37,7 @@ function Shell() {
           {[
             ['/', 'Übersicht'],
             ['/belege', 'Belege'],
+            ['/daten', 'Daten'],
             ['/erfassen', 'Erfassen'],
             ['/bericht', 'Bericht'],
           ].map(([to, label]) => (
@@ -37,13 +45,22 @@ function Shell() {
               key={to}
               to={to}
               end={to === '/'}
-              className="rounded-full px-3 py-1.5 text-sm font-medium"
+              className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium"
               style={({ isActive }) => ({
                 background: isActive ? 'var(--accent)' : 'transparent',
                 color: isActive ? '#fff' : 'var(--text-secondary)',
               })}
             >
               {label}
+              {to === '/daten' && warningCount > 0 && (
+                <span
+                  className="tabular rounded-full px-1.5 text-xs font-semibold"
+                  style={{ background: '#fab219', color: '#0b0b0b' }}
+                  aria-label={`${warningCount} offene Datenpunkte`}
+                >
+                  {warningCount}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>
@@ -63,6 +80,7 @@ function Shell() {
       <Routes>
         <Route path="/" element={<Overview />} />
         <Route path="/belege" element={<Records />} />
+        <Route path="/daten" element={<Quality />} />
         <Route path="/erfassen" element={<Entry />} />
         <Route path="/bericht" element={<Report />} />
         <Route path="*" element={<Navigate to="/" replace />} />

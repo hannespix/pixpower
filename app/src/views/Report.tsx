@@ -18,12 +18,19 @@ export function Report() {
   const [year, setYear] = useState(
     years.includes(currentYear) ? currentYear : years[years.length - 1],
   )
-  const summary = useMemo(() => summarizeYear(monthly, year), [monthly, year])
-  const prev = useMemo(() => summarizeYear(monthly, year - 1), [monthly, year])
+  const summary = useMemo(() => summarizeYear(monthly, year, true), [monthly, year])
+  const prev = useMemo(() => summarizeYear(monthly, year - 1, true), [monthly, year])
 
   const monthRows = MONTH_LABELS.map((label, i) => {
-    const rec = monthly.months.get(`${year}-${String(i + 1).padStart(2, '0')}`)
-    return { label, rec, total: rec ? totalOfMonth(rec) : 0 }
+    const key = `${year}-${String(i + 1).padStart(2, '0')}`
+    const rec = monthly.months.get(key)
+    const est = monthly.estimated.get(key)
+    return {
+      label,
+      rec,
+      est,
+      total: (rec ? totalOfMonth(rec) : 0) + (est ? totalOfMonth(est) : 0),
+    }
   })
 
   const activeCats = CATEGORIES.filter((c) => summary.perCategory[c] > 0.005 || prev.perCategory[c] > 0.005)
@@ -102,12 +109,18 @@ export function Report() {
             {monthRows.map((m) => (
               <tr key={m.label} style={{ borderBottom: '1px solid var(--grid)' }}>
                 <td className="py-1.5 pr-3">{m.label}</td>
-                {activeCats.map((c) => (
-                  <td key={c} className="tabular px-2 py-1.5 text-right" style={{ color: 'var(--text-secondary)' }}>
-                    {m.rec && m.rec[c] > 0.005 ? fmtEur(m.rec[c], 2) : '–'}
-                  </td>
-                ))}
-                <td className="tabular py-1.5 pl-3 text-right font-medium">{m.total > 0.005 ? fmtEur(m.total, 2) : '–'}</td>
+                {activeCats.map((c) => {
+                  const v = (m.rec?.[c] ?? 0) + (m.est?.[c] ?? 0)
+                  const hasEst = (m.est?.[c] ?? 0) > 0.005
+                  return (
+                    <td key={c} className="tabular px-2 py-1.5 text-right" style={{ color: 'var(--text-secondary)' }}>
+                      {v > 0.005 ? `${hasEst ? '~' : ''}${fmtEur(v, 2)}` : '–'}
+                    </td>
+                  )
+                })}
+                <td className="tabular py-1.5 pl-3 text-right font-medium">
+                  {m.total > 0.005 ? `${m.est && totalOfMonth(m.est) > 0.005 ? '~' : ''}${fmtEur(m.total, 2)}` : '–'}
+                </td>
               </tr>
             ))}
             <tr style={{ borderTop: '2px solid var(--baseline)' }}>
@@ -124,7 +137,10 @@ export function Report() {
         <p className="mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
           Kosten sind dem Verbrauchszeitraum zugeordnet (Abrechnungen verdrängen Abschläge, Wärme
           gradtagzahlgewichtet, Brennholz über {bundle.settings.woodSpreadMonths} Monate verteilt) —
-          nicht dem Zahlungsdatum. Erstellt am {new Date().toLocaleDateString('de-DE')}.
+          nicht dem Zahlungsdatum.
+          {summary.estimatedTotal > 0.5 &&
+            ` Mit ~ markierte Werte enthalten Schätzungen für Beleg-Lücken (${fmtEur(summary.estimatedTotal, 2)} im Jahr ${year}), abgeleitet aus den angrenzenden belegten Zeiträumen.`}{' '}
+          Erstellt am {new Date().toLocaleDateString('de-DE')}.
         </p>
       </div>
     </div>
