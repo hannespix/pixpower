@@ -2,7 +2,9 @@
   "house": {
     "name": "Wohnhaus & Weingut",
     "location": "Südbaden",
-    "heatingSystem": "Holzscheitvergaser ARCA RV40 (Bj. 1998, 40 kW, handbeschickt) + Solarthermie"
+    "heatingSystem": "Holzscheitvergaser ARCA RV40 (Bj. 1998, 40 kW, handbeschickt) + Solarthermie",
+    "heatedAreaM2": 250,
+    "buildingNote": "Baujahr 1889, EG unsaniert (~1 m Bruchsteinwaende, Doppelverglasung), DG 1998 komplett isoliert. 3 grosse + 1 normales Schlafzimmer (DG), Kueche/Wohnzimmer/Buero (EG), kleine Sauna mit Elektroofen."
   },
   "demoData": false,
   "woodSpreadMonths": 12,

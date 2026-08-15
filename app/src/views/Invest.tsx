@@ -3,22 +3,35 @@ import { EChart, axisDefaults, baseOption } from '../components/EChart'
 import { useData } from '../state/DataProvider'
 import { useTheme } from '../hooks/useTheme'
 import { fmtEur } from '../lib/engine'
-import { computeScenarios, type ScenarioKey, type ScenarioResult } from '../lib/invest'
+import {
+  HEAT_LABEL,
+  PRESETS,
+  STATUS_QUO,
+  WW_LABEL,
+  attachComparison,
+  comboKey,
+  computeCombo,
+  type Combo,
+  type ComboResult,
+  type HeatKey,
+  type WwKey,
+} from '../lib/invest'
 import type { Tier } from '../lib/schema'
 import { chartTokens, deEmphasis, type Mode } from '../lib/palette'
 
-/** feste Szenario-Farben (Farbe folgt dem Szenario, nie der Reihenfolge) */
-const SCENARIO_COLOR: Record<ScenarioKey, { light: string; dark: string } | null> = {
-  statusQuo: null, // De-Emphasis-Grau — der Status quo ist Kontext, nicht Kandidat
-  heatPump: { light: '#2a78d6', dark: '#3987e5' },
-  woodNew: { light: '#eb6834', dark: '#d95926' },
-  pvHeatPump: { light: '#1baf7a', dark: '#199e70' },
-  pv: { light: '#eda100', dark: '#c98500' },
-  pellet: { light: '#e87ba4', dark: '#d55181' },
+/** feste Farben je kuratierter Kombination; eigene Kombination = violett */
+const PRESET_COLOR: Record<string, { light: string; dark: string }> = {
+  'woodNew|0|bestand': { light: '#eb6834', dark: '#d95926' },
+  'pellet|0|bestand': { light: '#e87ba4', dark: '#d55181' },
+  'heatPump|0|bestand': { light: '#2a78d6', dark: '#3987e5' },
+  'bestand|15|bestand': { light: '#eda100', dark: '#c98500' },
+  'heatPump|15|bestand': { light: '#1baf7a', dark: '#199e70' },
+  'pellet|15|bwwp': { light: '#008300', dark: '#008300' },
 }
+const CUSTOM_COLOR = { light: '#4a3aa7', dark: '#9085e9' }
 
-const scenarioColor = (key: ScenarioKey, mode: Mode): string =>
-  SCENARIO_COLOR[key]?.[mode] ?? deEmphasis(mode)
+const comboColor = (key: string, mode: Mode): string =>
+  key === comboKey(STATUS_QUO) ? deEmphasis(mode) : (PRESET_COLOR[key] ?? CUSTOM_COLOR)[mode]
 
 const TIER_LABEL: Record<Tier, string> = {
   guenstig: 'günstiger Anbieter',
@@ -32,16 +45,23 @@ export function Invest() {
   const t = chartTokens(mode)
   const inv = bundle.investment
   const [tier, setTier] = useState<Tier>('typisch')
-  const [kwp, setKwp] = useState(inv.scenarios.pv.kwp)
+  const [custom, setCustom] = useState<Combo>({ heat: 'pellet', pvKwp: 20, ww: 'bwwp' })
 
-  const results = useMemo(() => computeScenarios(inv, tier, kwp), [inv, tier, kwp])
-  const statusQuo = results[0]
-  const candidates = results.slice(1)
-  const best = candidates.reduce((a, b) => (b.horizonSavings > a.horizonSavings ? b : a))
+  const { results, statusQuo, customResult, best } = useMemo(() => {
+    const statusQuo = computeCombo(inv, tier, STATUS_QUO)
+    const presetResults = PRESETS.map((c) => computeCombo(inv, tier, c))
+    const customResult = computeCombo(inv, tier, custom)
+    const isDuplicate =
+      customResult.key === statusQuo.key || presetResults.some((r) => r.key === customResult.key)
+    const results = [statusQuo, ...presetResults, ...(isDuplicate ? [] : [customResult])]
+    attachComparison(statusQuo, results)
+    const candidates = results.filter((r) => r.key !== statusQuo.key)
+    const best = candidates.reduce((a, b) => (b.horizonSavings > a.horizonSavings ? b : a))
+    return { results, statusQuo, customResult: isDuplicate ? null : customResult, best }
+  }, [inv, tier, custom])
+
   const startYear = new Date().getFullYear()
   const H = inv.horizonYears
-
-  // --- Chart 1: kumulierte Gesamtkosten mit Break-even-Punkten -------------
   const ax = axisDefaults(mode)
   const yearsAxis = Array.from({ length: H + 1 }, (_, y) => (y === 0 ? 'heute' : String(startYear + y)))
 
@@ -60,24 +80,24 @@ export function Invest() {
       itemHeight: 8,
       textStyle: { color: t.textSecondary, fontSize: 12 },
     },
-    grid: { left: 8, right: 16, top: 52, bottom: 4, containLabel: true },
+    grid: { left: 8, right: 16, top: 64, bottom: 4, containLabel: true },
     xAxis: { type: 'category', data: yearsAxis, boundaryGap: false, ...ax.category },
     yAxis: { type: 'value', ...ax.value },
     series: results.map((r) => {
-      const color = scenarioColor(r.key, mode)
-      const isRef = r.key === 'statusQuo'
+      const color = comboColor(r.key, mode)
+      const isRef = r.key === statusQuo.key
+      const isCustom = customResult !== null && r.key === customResult.key
       const isBest = r.key === best.key
       return {
         name: r.label,
         type: 'line' as const,
         data: r.cumulative.map((v) => Math.round(v)),
-        lineStyle: { width: 2, color, type: isRef ? ('dashed' as const) : ('solid' as const) },
+        lineStyle: { width: isCustom ? 3 : 2, color, type: isRef ? ('dashed' as const) : ('solid' as const) },
         itemStyle: { color, borderColor: t.surface, borderWidth: 2 },
         symbol: 'circle',
         symbolSize: 8,
         showSymbol: false,
-        z: isBest ? 4 : isRef ? 2 : 3,
-        endLabel: undefined,
+        z: isCustom ? 5 : isBest ? 4 : isRef ? 2 : 3,
         markPoint:
           r.breakEvenYear !== null
             ? {
@@ -85,9 +105,9 @@ export function Invest() {
                 symbolSize: 10,
                 itemStyle: { color, borderColor: t.surface, borderWidth: 2 },
                 label: {
-                  show: isBest,
-                  formatter: `lohnt sich ab ${startYear + r.breakEvenYear}`,
-                  position: 'top' as const,
+                  show: isBest || isCustom,
+                  formatter: `${isCustom ? 'deine Kombi: ' : ''}lohnt sich ab ${startYear + r.breakEvenYear}`,
+                  position: (isCustom ? 'bottom' : 'top') as 'top' | 'bottom',
                   color: t.textPrimary,
                   fontSize: 11,
                 },
@@ -98,11 +118,10 @@ export function Invest() {
     }),
   }
 
-  // --- Chart 2: aequivalente Jahreskosten, aufgeschluesselt ----------------
   const parts = [
     { key: 'kapital' as const, label: 'Kapitalkosten (Annuität)', color: mode === 'light' ? '#4a3aa7' : '#9085e9' },
     { key: 'energie' as const, label: 'Energie (netto)', color: mode === 'light' ? '#2a78d6' : '#3987e5' },
-    { key: 'betrieb' as const, label: 'Wartung & Kaminkehrer', color: mode === 'light' ? '#e34948' : '#e66767' },
+    { key: 'betrieb' as const, label: 'Wartung, Reparatur & Kaminkehrer', color: mode === 'light' ? '#e34948' : '#e66767' },
     { key: 'eigenarbeit' as const, label: 'Eigenarbeit Holz', color: mode === 'light' ? '#eb6834' : '#d95926' },
   ]
   const sortedByAnnual = [...results].sort((a, b) => b.equivalentAnnualCost - a.equivalentAnnualCost)
@@ -123,31 +142,28 @@ export function Invest() {
       itemHeight: 12,
       textStyle: { color: t.textSecondary, fontSize: 12 },
     },
-    grid: { left: 8, right: 56, top: 52, bottom: 4, containLabel: true },
+    grid: { left: 8, right: 60, top: 52, bottom: 4, containLabel: true },
     xAxis: { type: 'value', ...ax.value },
     yAxis: { type: 'category', data: sortedByAnnual.map((r) => r.label), ...ax.category },
-    series: [
-      ...parts.map((p, pi) => ({
-        name: p.label,
-        type: 'bar' as const,
-        stack: 'jahr',
-        barMaxWidth: 24,
-        itemStyle: { color: p.color, borderColor: t.surface, borderWidth: 1 },
-        data: sortedByAnnual.map((r) => Math.round(r.breakdown[p.key])),
-        ...(pi === parts.length - 1
-          ? {
-              label: {
-                show: true,
-                position: 'right' as const,
-                color: t.textSecondary,
-                fontSize: 11,
-                formatter: (prm: { dataIndex: number }) =>
-                  fmtEur(sortedByAnnual[prm.dataIndex].equivalentAnnualCost),
-              },
-            }
-          : {}),
-      })),
-    ],
+    series: parts.map((p, pi) => ({
+      name: p.label,
+      type: 'bar' as const,
+      stack: 'jahr',
+      barMaxWidth: 24,
+      itemStyle: { color: p.color, borderColor: t.surface, borderWidth: 1 },
+      data: sortedByAnnual.map((r) => Math.round(r.breakdown[p.key])),
+      ...(pi === parts.length - 1
+        ? {
+            label: {
+              show: true,
+              position: 'right' as const,
+              color: t.textSecondary,
+              fontSize: 11,
+              formatter: (prm: { dataIndex: number }) => fmtEur(sortedByAnnual[prm.dataIndex].equivalentAnnualCost),
+            },
+          }
+        : {}),
+    })),
   }
 
   const chipStyle = (active: boolean) =>
@@ -157,29 +173,67 @@ export function Invest() {
       color: active ? 'var(--text-primary)' : 'var(--text-muted)',
     }) as const
 
+  const Chips = <K extends string>({
+    label,
+    value,
+    options,
+    onChange,
+  }: {
+    label: string
+    value: K
+    options: [K, string][]
+    onChange: (v: K) => void
+  }) => (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="w-28 text-sm" style={{ color: 'var(--text-secondary)' }}>
+        {label}
+      </span>
+      {options.map(([k, l]) => (
+        <button key={k} type="button" onClick={() => onChange(k)} aria-pressed={value === k}
+          className="rounded-full border px-3 py-1 text-xs font-medium" style={chipStyle(value === k)}>
+          {l}
+        </button>
+      ))}
+    </div>
+  )
+
   return (
     <div className="space-y-4">
-      {/* Steuerung: Kostenstruktur + PV-Groesse */}
-      <div className="no-print flex flex-wrap items-center gap-2">
-        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-          Kostenstruktur:
-        </span>
-        {(['guenstig', 'typisch', 'premium'] as const).map((k) => (
-          <button key={k} type="button" onClick={() => setTier(k)} aria-pressed={tier === k}
-            className="rounded-full border px-3 py-1 text-xs font-medium" style={chipStyle(tier === k)}>
-            {TIER_LABEL[k]}
-          </button>
-        ))}
-        <div className="mx-2 h-5 w-px" style={{ background: 'var(--baseline)' }} />
-        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-          PV-Größe:
-        </span>
-        {[10, 15, 20].map((k) => (
-          <button key={k} type="button" onClick={() => setKwp(k)} aria-pressed={kwp === k}
-            className="rounded-full border px-3 py-1 text-xs font-medium" style={chipStyle(kwp === k)}>
-            {k} kWp
-          </button>
-        ))}
+      {/* Baukasten */}
+      <div className="card no-print space-y-2.5 p-4">
+        <h2 className="text-sm font-semibold">
+          Baukasten — kombiniere deine Variante{' '}
+          <span className="font-normal" style={{ color: 'var(--text-muted)' }}>
+            (violette Linie im Chart)
+          </span>
+        </h2>
+        <Chips<HeatKey>
+          label="Wärme"
+          value={custom.heat}
+          options={(Object.entries(HEAT_LABEL) as [HeatKey, string][])}
+          onChange={(heat) => setCustom((c) => ({ ...c, heat }))}
+        />
+        <Chips<`${number}`>
+          label="Photovoltaik"
+          value={String(custom.pvKwp) as `${number}`}
+          options={[['0', 'keine'], ['10', '10 kWp'], ['15', '15 kWp'], ['20', '20 kWp'], ['25', '25 kWp']]}
+          onChange={(v) => setCustom((c) => ({ ...c, pvKwp: Number(v) }))}
+        />
+        <Chips<WwKey>
+          label="Warmwasser"
+          value={custom.ww}
+          options={(Object.entries(WW_LABEL) as [WwKey, string][])}
+          onChange={(ww) => setCustom((c) => ({ ...c, ww }))}
+        />
+        <Chips<Tier>
+          label="Kostenstruktur"
+          value={tier}
+          options={(Object.entries(TIER_LABEL) as [Tier, string][])}
+          onChange={setTier}
+        />
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {inv.tierEffects.note}
+        </p>
       </div>
 
       {/* Hero: beste Option */}
@@ -189,7 +243,7 @@ export function Invest() {
         </div>
         <div className="mt-1 flex flex-wrap items-baseline gap-x-3">
           <span className="flex items-center gap-2 text-3xl font-semibold">
-            <span aria-hidden className="inline-block h-3.5 w-3.5 rounded-full" style={{ background: scenarioColor(best.key, mode) }} />
+            <span aria-hidden className="inline-block h-3.5 w-3.5 rounded-full" style={{ background: comboColor(best.key, mode) }} />
             {best.label}
           </span>
           <span className="text-xl font-semibold" style={{ color: 'var(--good-text)' }}>
@@ -204,46 +258,57 @@ export function Invest() {
         <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
           gegenüber „Weiter wie bisher" ({fmtEur(statusQuo.equivalentAnnualCost)}/Jahr inkl.{' '}
           {fmtEur(statusQuo.breakdown.eigenarbeit)} bewerteter Eigenarbeit). Der Vergleich unterschlägt,
-          dass der {new Date().getFullYear() - 1998} Jahre alte Kessel ohnehin bald ersetzt werden muss —
-          der Status quo ist also geschmeichelt.
+          dass der {startYear - 1998} Jahre alte Kessel ohnehin bald ersetzt werden muss — der Status quo
+          ist also geschmeichelt.
         </p>
       </div>
 
-      {/* Szenario-Karten */}
+      {/* Kombinations-Karten */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {candidates.map((r) => (
-          <ScenarioCard key={r.key} r={r} mode={mode} startYear={startYear} best={r.key === best.key} />
-        ))}
+        {results
+          .filter((r) => r.key !== statusQuo.key)
+          .map((r) => (
+            <ComboCard
+              key={r.key}
+              r={r}
+              mode={mode}
+              startYear={startYear}
+              best={r.key === best.key}
+              custom={customResult !== null && r.key === customResult.key}
+            />
+          ))}
       </div>
 
       <div className="card p-4">
         <h2 className="mb-2 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
           Kumulierte Gesamtkosten — der Schnittpunkt mit der grauen Linie ist der Break-even
         </h2>
-        <EChart option={cumulativeOption} mode={mode} height={380} ariaLabel="Kumulierte Gesamtkosten der Szenarien über den Planungshorizont" />
+        <EChart option={cumulativeOption} mode={mode} height={400} ariaLabel="Kumulierte Gesamtkosten aller Kombinationen über den Planungshorizont" />
       </div>
 
       <div className="card p-4">
         <h2 className="mb-2 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
           Äquivalente Jahreskosten (CAPEX als Annuität, {inv.interestRatePct} % Zins) — negative Energie = PV-Erträge übersteigen Zukauf
         </h2>
-        <EChart option={annualOption} mode={mode} height={300} ariaLabel="Jahreskosten der Szenarien nach Kostenart" />
+        <EChart option={annualOption} mode={mode} height={340} ariaLabel="Jahreskosten der Kombinationen nach Kostenart" />
       </div>
 
-      {/* Annahmen & Foerderung */}
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="card p-5 text-sm">
           <h3 className="font-semibold">Datenbasis</h3>
           <ul className="mt-2 list-disc space-y-1 pl-5" style={{ color: 'var(--text-secondary)' }}>
             <li>Strom: {inv.power.consumptionKwh.toLocaleString('de-DE')} kWh/a zu {inv.power.pricePerKwhCt.toLocaleString('de-DE')} ct/kWh — aus Zählerständen und aktuellem Vertrag</li>
-            <li>Wärme: {inv.heat.sterPerYear} Ster/a à {fmtEur(inv.heat.eurPerSter)} — aus den Forstbetrieb-Rechnungen 2025/26</li>
-            <li>Kessel: {bundle.settings.house.heatingSystem}</li>
+            <li>Wärme: {inv.heat.sterPerYear} Ster/a à {fmtEur(inv.heat.eurPerSter)} — aus den Forstbetrieb-Rechnungen; entspricht{' '}
+              {bundle.settings.house.heatedAreaM2
+                ? `${Math.round((inv.heat.sterPerYear * inv.heat.kwhPerSter * inv.heat.oldBoilerEfficiency) / bundle.settings.house.heatedAreaM2)} kWh/m²·a bei ${bundle.settings.house.heatedAreaM2} m²`
+                : 'n/a'}{' '}
+              — plausibel für teilsanierten Altbau</li>
+            <li>Gebäude: Bj. 1889, EG unsaniert (1 m Bruchstein), DG 1998 isoliert → WP mit JAZ {inv.scenarios.heatPump.jaz} (+Struktur-Effekt) konservativ gerechnet</li>
             <li>Eigenarbeit: {inv.heat.ownWorkHoursPerYear} h/a à {fmtEur(inv.heat.ownWorkEurPerHour)} — macht „mehr Komfort" vergleichbar</li>
           </ul>
           <p className="mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
-            Für präzisere Zahlen fehlen noch: <strong>Dachdaten</strong> (Ausrichtung/Neigung/Fläche → echter
-            PV-Ertrag via PVGIS), <strong>beheizte Wohnfläche</strong> und <strong>Heizkörper vs.
-            Fußbodenheizung</strong> (→ JAZ der Wärmepumpe). Alle Annahmen editierbar in{' '}
+            Für präzisere Zahlen fehlen noch: <strong>Dachdaten</strong> (→ PVGIS-Ertrag) und{' '}
+            <strong>Heizkörper-Vorlauftemperatur</strong> (→ JAZ). Alle Annahmen editierbar in{' '}
             <code>data/investment.json</code>.
           </p>
         </div>
@@ -262,25 +327,32 @@ export function Invest() {
   )
 }
 
-function ScenarioCard({
+function ComboCard({
   r,
   mode,
   startYear,
   best,
+  custom,
 }: {
-  r: ScenarioResult
+  r: ComboResult
   mode: Mode
   startYear: number
   best: boolean
+  custom: boolean
 }) {
   return (
-    <div className="card p-4" style={best ? { borderColor: 'var(--accent)' } : undefined}>
+    <div className="card p-4" style={best || custom ? { borderColor: comboColor(r.key, mode) } : undefined}>
       <div className="flex items-center gap-2 text-sm font-semibold">
-        <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: scenarioColor(r.key, mode) }} />
-        {r.label}
+        <span aria-hidden className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: comboColor(r.key, mode) }} />
+        <span className="min-w-0 flex-1">{r.label}</span>
         {best && (
-          <span className="rounded-full px-2 py-0.5 text-xs font-medium text-white" style={{ background: 'var(--accent)' }}>
-            beste Option
+          <span className="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium text-white" style={{ background: 'var(--accent)' }}>
+            beste
+          </span>
+        )}
+        {custom && (
+          <span className="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium text-white" style={{ background: comboColor(r.key, mode) }}>
+            deine Kombi
           </span>
         )}
       </div>
