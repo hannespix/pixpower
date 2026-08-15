@@ -1,0 +1,15 @@
+# Abhängigkeiten & Build
+node_modules/
+app/dist/
+
+# Generiert aus /data durch scripts/build-data.ts — nie einchecken
+# (kann je nach Build verschlüsselt oder Klartext sein)
+app/public/data.json
+
+# Original-Rechnungen bleiben lokal, nie im Repo
+rechnungen/
+*.pdf
+
+# Logs & Editor
+*.log
+.DS_Store
