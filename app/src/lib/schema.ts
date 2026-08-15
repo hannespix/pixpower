@@ -150,6 +150,8 @@ export const investmentSchema = z.object({
   power: z.object({
     consumptionKwh: z.number().positive(),
     pricePerKwhCt: z.number().positive(),
+    /** typische Mittagslast Haus + Weingut (fuer die PV-Dimensionierung) */
+    middayBaseLoadKw: z.number().nonnegative(),
     note: z.string().optional(),
   }),
   /** Familien-Verbrauchsmodell: Personenbedarf nach Alter, dynamisch je Planungsjahr */
@@ -211,6 +213,8 @@ export const investmentSchema = z.object({
       specificYieldKwhPerKwp: z.number().positive(),
       capexPerKwp: tierEur,
       selfConsumptionPct: z.number().min(0).max(100),
+      /** Anteil der Peakleistung, den die Anlage an einem klaren Sommermittag liefert */
+      summerPeakFactor: z.number().min(0.3).max(1),
       feedInCtPerKwh: z.number().nonnegative(),
       omPctOfCapex: z.number().nonnegative(),
       inverterReplaceYear: z.number().int().positive(),
@@ -235,6 +239,10 @@ export const investmentSchema = z.object({
       capexEur: tierEur,
       kwhPerYear: z.number().nonnegative(),
       pvCoverPct: z.number().min(0).max(100),
+      /** zusaetzliche Eigenstrom-Deckung, wenn ein Speicher die Nachtkuehlung traegt */
+      batteryCoverDeltaPp: z.number().min(0).max(50),
+      /** elektrische Leistung der Klimaanlage (fuer die PV-Dimensionierung) */
+      powerKw: z.number().positive(),
       maintenanceEur: z.number().nonnegative(),
       note: z.string().optional(),
     }),

@@ -458,6 +458,26 @@ export function Invest() {
           options={[['nein', 'ohne'], ['ja', '❄ Klimaanlage Schlafzimmer']]}
           onChange={(v) => setCustom((c) => ({ ...c, klima: v === 'ja' }))}
         />
+        {custom.klima && (
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            {custom.pvKwp === 0 ? (
+              <>Ohne PV läuft die Klima komplett aus dem Netz — mit PV wird sie fast zum Nulltarif gekühlt.</>
+            ) : (
+              <>
+                Eigenstrom-Deckung deiner Auswahl:{' '}
+                <strong style={{ color: 'var(--text-primary)' }}>
+                  {Math.min(100, s.klima.pvCoverPct + (custom.smart ? s.smart.klimaPvCoverDeltaPp : 0) + (custom.batteryKwh > 0 ? s.klima.batteryCoverDeltaPp : 0))} %
+                </strong>{' '}
+                — {s.klima.pvCoverPct} % direkt aus PV (heiß = sonnig), +{s.smart.klimaPvCoverDeltaPp} %-Pkt. mit Smart
+                (Vorkühlung am Nachmittag), +{s.klima.batteryCoverDeltaPp} %-Pkt. mit Speicher (Nachtkühlung der
+                Schlafzimmer aus dem Tagesüberschuss) → 100 % mit beidem. Leistungscheck: Klima (~{s.klima.powerKw.toLocaleString('de-DE')} kW) +
+                typische Grundlast (~{inv.power.middayBaseLoadKw.toLocaleString('de-DE')} kW) laufen an einem Sommermittag ab ~
+                {Math.ceil((s.klima.powerKw + inv.power.middayBaseLoadKw) / s.pv.summerPeakFactor)} kWp komplett aus
+                der Sonne — deine {custom.pvKwp} kWp liegen weit darüber.
+              </>
+            )}
+          </p>
+        )}
         <Chips<'ja' | 'nein'>
           label="Smart"
           value={custom.smart ? 'ja' : 'nein'}
@@ -702,7 +722,7 @@ export function Invest() {
             <li>Familie: Strom- und Warmwasserbedarf je Planungsjahr aus dem Familienmodell (Reiter „Familie & Verbrauch") — Teenager-Peak und Auszug sind eingerechnet, in allen Kombinationen inkl. Status quo</li>
             <li>Smart: hebt PV-Deckungsgrade nur für tatsächlich gewählte Bausteine (WP +{s.smart.wpPvCoverDeltaPp}, WW +{s.smart.wwPvCoverDeltaPp}, Klima +{s.smart.klimaPvCoverDeltaPp} %-Pkt., EV-Quote +{s.smart.selfConsumptionDeltaPp} %-Pkt.) und spart {s.smart.householdSavingsPct} % Haushaltsstrom</li>
             <li>Speicher: {s.battery.cyclesPerYear} Vollzyklen/a, {Math.round((1 - s.battery.efficiency) * 100)} % Verluste — verschiebt Überschuss in den Eigenverbrauch</li>
-            <li>Klimaanlage: reiner Komfortbaustein ({s.klima.kwhPerYear} kWh/a Kühlstrom, {s.klima.pvCoverPct} % PV-gedeckt) — kostet, spart nichts</li>
+            <li>Klimaanlage: reiner Komfortbaustein ({s.klima.kwhPerYear} kWh/a Kühlstrom, ~{s.klima.powerKw.toLocaleString('de-DE')} kW) — Eigenstrom-Deckung gestaffelt {s.klima.pvCoverPct}/{s.klima.pvCoverPct + s.smart.klimaPvCoverDeltaPp}/100 % (PV / +Smart-Vorkühlung / +Speicher für die Nachtkühlung)</li>
             <li>Eigenarbeit: {inv.heat.ownWorkHoursPerYear} h/a à {fmtEur(inv.heat.ownWorkEurPerHour)} — macht „mehr Komfort" vergleichbar</li>
           </ul>
           <p className="mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
