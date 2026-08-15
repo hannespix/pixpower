@@ -95,6 +95,38 @@
       "label": "PV + Wärmepumpe",
       "wpPvCoverPct": 25,
       "note": "Kopplungsparameter: Anteil des WP-Stroms aus eigener PV (Winterlast!). Gilt fuer jede Kombination aus Waermepumpe + PV."
+    },
+    "battery": {
+      "label": "Stromspeicher",
+      "capexPerKwh": {
+        "guenstig": 450,
+        "typisch": 650,
+        "premium": 900
+      },
+      "cyclesPerYear": 220,
+      "efficiency": 0.9,
+      "note": "Preise 2026 inkl. Montage (Preise stark gefallen). Faustregel Groesse: ~1 kWh je 1.000 kWh Jahresverbrauch bzw. je kWp. Verschiebt PV-Ueberschuss in den Eigenverbrauch: ~220 Vollzyklen/a, ~10% Speicherverluste. Lebensdauer ~15 J. — Ersatz am Horizontende nicht eingerechnet."
+    },
+    "klima": {
+      "label": "Klimaanlage OG",
+      "capexEur": {
+        "guenstig": 4500,
+        "typisch": 7000,
+        "premium": 10500
+      },
+      "kwhPerYear": 450,
+      "pvCoverPct": 60,
+      "maintenanceEur": 100,
+      "note": "Multisplit fuer die 3-4 Schlafzimmer im isolierten DG (1998), inkl. Montage. Reiner Komfortbaustein — Kuehlstrom ~450 kWh/a laeuft genau dann, wenn PV liefert (60% PV-gedeckt). Kann in der Uebergangszeit auch effizient heizen (nicht eingerechnet)."
+    },
+    "elektro": {
+      "label": "Elektro & Installation",
+      "capexEur": {
+        "guenstig": 1500,
+        "typisch": 2500,
+        "premium": 4000
+      },
+      "note": "Zaehlerschrank-Umbau, Leitungen, Netzanmeldung — faellt einmal an, sobald PV, Waermepumpe, Speicher oder Klima kommen. Grobe Schaetzung, per Regler ans echte Angebot anpassen."
     }
   },
   "subsidyNote": "KfW 458 (Stand 08/2026): 30% Grundfoerderung + 16% Klimageschwindigkeitsbonus (sinkt ab 02/2027 alle 6 Monate um 4 Punkte!) auf max. 28.000 EUR foerderfaehige Kosten. Einkommensbonus +30% bei zu versteuerndem Haushaltseinkommen <= 40.000 EUR nicht eingerechnet. PV: 0% MwSt, EEG-Verguetung 20 Jahre garantiert.",

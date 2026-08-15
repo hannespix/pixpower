@@ -208,6 +208,26 @@ export const investmentSchema = z.object({
       wpPvCoverPct: z.number().min(0).max(100),
       note: z.string().optional(),
     }),
+    battery: z.object({
+      label: z.string(),
+      capexPerKwh: tierEur,
+      cyclesPerYear: z.number().positive(),
+      efficiency: z.number().min(0.5).max(1),
+      note: z.string().optional(),
+    }),
+    klima: z.object({
+      label: z.string(),
+      capexEur: tierEur,
+      kwhPerYear: z.number().nonnegative(),
+      pvCoverPct: z.number().min(0).max(100),
+      maintenanceEur: z.number().nonnegative(),
+      note: z.string().optional(),
+    }),
+    elektro: z.object({
+      label: z.string(),
+      capexEur: tierEur,
+      note: z.string().optional(),
+    }),
   }),
   /** Warmwasser-Baustein (kombinierbar mit jedem Waermeerzeuger) */
   ww: z.object({
