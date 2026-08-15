@@ -1,4 +1,7 @@
 [
+  { "id": "r-strom-alt-2023-03-09", "meter": "strom-alt", "type": "strom", "date": "2023-03-09", "value": 41529, "unit": "kWh" },
+  { "id": "r-strom-alt-2023-12-31", "meter": "strom-alt", "type": "strom", "date": "2023-12-31", "value": 51167, "unit": "kWh" },
+  { "id": "r-strom-alt-2024-04-10", "meter": "strom-alt", "type": "strom", "date": "2024-04-10", "value": 54704, "unit": "kWh" },
   { "id": "r-strom-alt-2025-09-01", "meter": "strom-alt", "type": "strom", "date": "2025-09-01", "value": 69626, "unit": "kWh" },
   { "id": "r-strom-alt-2025-09-30", "meter": "strom-alt", "type": "strom", "date": "2025-09-30", "value": 70508, "unit": "kWh" },
   { "id": "r-strom-alt-2025-10-07", "meter": "strom-alt", "type": "strom", "date": "2025-10-07", "value": 70715, "unit": "kWh" },
