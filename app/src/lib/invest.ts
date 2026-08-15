@@ -1,23 +1,26 @@
 import type { InvestmentSettings, Tier } from './schema'
 
 /**
- * Investitionsrechnung als Baukasten: Waermeerzeuger x PV-Groesse x Speicher x
- * Warmwasser-System x Klimaanlage sind frei kombinierbar; jede Kombination
- * wird ueber den Planungshorizont durchgerechnet.
+ * Investitionsrechnung als Baukasten: Waermeerzeuger x PV x Speicher x
+ * Warmwasser x Klima x Smart-Energiemanagement sind frei kombinierbar;
+ * jede Kombination wird ueber den Planungshorizont durchgerechnet.
  *
- * Sichten:
- * - Kumulierte Gesamtkosten (CAPEX netto in Jahr 0, dann Betriebskosten
- *   mit Preissteigerung) -> Break-even vs. Status quo.
- * - Aequivalente Jahreskosten (CAPEX als Annuitaet + Ø Betrieb).
+ * Ganzheitlich & dynamisch:
+ * - Familienmodell (inv.household): Strom- und Warmwasserbedarf werden je
+ *   Planungsjahr aus dem Alter der Kinder berechnet (Teenager-Peak,
+ *   spaeter Auszug). Alle Kombinationen — auch der Status quo — rechnen
+ *   mit demselben wachsenden/schrumpfenden Bedarf.
+ * - Smart-Baustein: verzahnt nur die tatsaechlich gewaehlten Systeme
+ *   (WP laeuft in den Sonnenstunden, WW ueberschussgesteuert, Klima kuehlt
+ *   vor, Lastverschiebung) -> hoehere PV-Deckungsgrade + Stromeinsparung.
  *
- * Qualitaet der Kostenstruktur (tierEffects): guenstige Angebote sparen
- * an Planung/Einbau -> hoehere Wartungs-/Reparaturkosten und bei der WP
- * schlechtere JAZ; Premium umgekehrt. Der Status quo bekommt bewusst
- * KEINE fiktive Ersatzinvestition (wird als Hinweis ausgewiesen).
+ * Sichten: kumulierte Gesamtkosten (Break-even vs. Status quo) und
+ * aequivalente Jahreskosten (CAPEX als Annuitaet). Qualitaet der
+ * Kostenstruktur (tierEffects) wie gehabt; der Status quo bekommt bewusst
+ * KEINE fiktive Ersatzinvestition.
  *
  * PriceOverrides: jeder CAPEX-Einzelposten kann mit dem Preis eines echten
- * Angebots ueberschrieben werden (Regler im UI); ohne Override gilt der
- * Marktwert der gewaehlten Kostenstruktur.
+ * Angebots ueberschrieben werden (Regler im UI).
  */
 
 export type HeatKey = 'bestand' | 'woodNew' | 'pellet' | 'heatPump'
@@ -31,6 +34,8 @@ export interface Combo {
   ww: WwKey
   /** Multisplit fuer die Schlafzimmer im OG — reiner Komfortbaustein */
   klima: boolean
+  /** Energiemanagement + smarte Verzahnung der gewaehlten Systeme */
+  smart: boolean
 }
 
 /** Angebotspreise, die die Marktwerte der Kostenstruktur ersetzen */
@@ -41,6 +46,7 @@ export interface PriceOverrides {
   wwCapexEur?: number
   klimaCapexEur?: number
   elektroCapexEur?: number
+  smartCapexEur?: number
 }
 
 export const HEAT_LABEL: Record<HeatKey, string> = {
@@ -57,7 +63,7 @@ export const WW_LABEL: Record<WwKey, string> = {
 }
 
 export const comboKey = (c: Combo): string =>
-  `${c.heat}|${c.pvKwp}|${c.pvKwp > 0 ? c.batteryKwh : 0}|${c.ww}|${c.klima ? 'K' : '-'}`
+  `${c.heat}|${c.pvKwp}|${c.pvKwp > 0 ? c.batteryKwh : 0}|${c.ww}|${c.klima ? 'K' : '-'}|${c.smart ? 'S' : '-'}`
 
 export function comboLabel(c: Combo): string {
   const parts: string[] = [HEAT_LABEL[c.heat]]
@@ -65,8 +71,63 @@ export function comboLabel(c: Combo): string {
   if (c.pvKwp > 0 && c.batteryKwh > 0) parts.push(`Speicher ${c.batteryKwh} kWh`)
   if (c.ww !== 'bestand') parts.push(WW_LABEL[c.ww])
   if (c.klima) parts.push('Klima')
-  if (c.heat === 'bestand' && c.pvKwp === 0 && c.ww === 'bestand' && !c.klima) return 'Weiter wie bisher'
+  if (c.smart) parts.push('Smart')
+  if (c.heat === 'bestand' && c.pvKwp === 0 && c.ww === 'bestand' && !c.klima && !c.smart) return 'Weiter wie bisher'
   return parts.join(' + ')
+}
+
+// ---------------------------------------------------------------------------
+// Familien-Verbrauchsmodell
+// ---------------------------------------------------------------------------
+
+export interface HouseholdYear {
+  /** Kalenderjahr */
+  year: number
+  /** Haushaltsstrom gesamt (Grundlast + Personen), ohne Smart-Einsparung */
+  stromKwh: number
+  /** konstante Grundlast (Weingut, Sauna, Haus) */
+  baseKwh: number
+  /** Warmwasserbedarf thermisch */
+  wwKwh: number
+  kidsAtHome: number
+  teens: number
+}
+
+/** Bedarf des Haushalts im Planungsjahr y (0 = referenceYear) */
+export function householdYear(inv: InvestmentSettings, y: number): HouseholdYear {
+  const hh = inv.household
+  const year = hh.referenceYear + y
+  let strom = hh.adults * hh.stromKwhPerAdult
+  let ww = hh.adults * hh.wwKwhPerAdult
+  let kidsAtHome = 0
+  let teens = 0
+  for (const by of hh.kidBirthYears) {
+    const age = year - by
+    if (age >= hh.moveOutAge) continue
+    kidsAtHome++
+    if (age >= hh.teenFromAge) {
+      teens++
+      strom += hh.stromKwhPerTeen
+      ww += hh.wwKwhPerTeen
+    } else {
+      strom += hh.stromKwhPerChild
+      ww += hh.wwKwhPerChild
+    }
+  }
+  // Grundlast (Weingut, Sauna, Haus) = gemessener Verbrauch minus Personen im Referenzjahr
+  const base = inv.power.consumptionKwh - personsStromAtRef(inv)
+  return { year, stromKwh: base + strom, baseKwh: base, wwKwh: ww, kidsAtHome, teens }
+}
+
+function personsStromAtRef(inv: InvestmentSettings): number {
+  const hh = inv.household
+  let strom = hh.adults * hh.stromKwhPerAdult
+  for (const by of hh.kidBirthYears) {
+    const age = hh.referenceYear - by
+    if (age >= hh.moveOutAge) continue
+    strom += age >= hh.teenFromAge ? hh.stromKwhPerTeen : hh.stromKwhPerChild
+  }
+  return strom
 }
 
 export interface CostBreakdown {
@@ -123,27 +184,24 @@ export function computeCombo(
   const stromCt = inv.power.pricePerKwhCt
   const feedCt = s.pv.feedInCtPerKwh
   const battKwh = combo.pvKwp > 0 ? combo.batteryKwh : 0
+  const sm = combo.smart ? s.smart : null
+
+  // Smart hebt Deckungsgrade nur fuer vorhandene Bausteine
+  const selfPct = Math.min(100, s.pv.selfConsumptionPct + (sm?.selfConsumptionDeltaPp ?? 0))
+  const wpCoverPct = Math.min(100, s.pvHeatPump.wpPvCoverPct + (sm?.wpPvCoverDeltaPp ?? 0))
+  const wwCoverPct = Math.min(100, inv.ww.pvCoverPct + (sm?.wwPvCoverDeltaPp ?? 0))
+  const klimaCoverPct = Math.min(100, s.klima.pvCoverPct + (sm?.klimaPvCoverDeltaPp ?? 0))
 
   const usefulHeatKwh = h.sterPerYear * h.kwhPerSter * h.oldBoilerEfficiency
+  /** reiner Heizanteil: gemessene Nutzwaerme minus Warmwasser im Referenzjahr */
+  const heatingOnlyKwh = usefulHeatKwh - householdYear(inv, 0).wwKwh
 
-  // --- Warmwasser-Baustein -------------------------------------------------
   const wwSpec = combo.ww === 'bwwp' ? inv.ww.bwwp : combo.ww === 'heizstab' ? inv.ww.heizstab : null
-  const wwCoveredKwh = wwSpec
-    ? inv.ww.kwhPerYear * (combo.pvKwp > 0 ? inv.ww.pvCoverPct / 100 : 1)
-    : 0
-  const wwStromKwh = wwSpec ? wwCoveredKwh / wwSpec.cop : 0
-  /** vom Waermeerzeuger noch zu liefernde Waerme */
-  const heatNeedKwh = usefulHeatKwh - wwCoveredKwh
-
-  // --- Waermepumpe ---------------------------------------------------------
   const jaz = Math.max(1.5, s.heatPump.jaz + fx.jazDelta[tier])
-  const wpStromKwh = combo.heat === 'heatPump' ? heatNeedKwh / jaz : 0
-  const wpFromPvKwh =
-    combo.heat === 'heatPump' && combo.pvKwp > 0 ? wpStromKwh * (s.pvHeatPump.wpPvCoverPct / 100) : 0
 
-  // --- Klimaanlage (Komfort) ----------------------------------------------
-  const klimaKwh = combo.klima ? s.klima.kwhPerYear : 0
-  const klimaPvKwh = combo.klima && combo.pvKwp > 0 ? klimaKwh * (s.klima.pvCoverPct / 100) : 0
+  /** Haushaltsstrom im Jahr y (nach Smart-Einsparung) */
+  const consumption = (y: number): number =>
+    householdYear(inv, y).stromKwh * (1 - (sm?.householdSavingsPct ?? 0) / 100)
 
   // --- PV + Speicher -------------------------------------------------------
   const pvPerKwp = ov.pvEurPerKwp ?? s.pv.capexPerKwp[tier]
@@ -159,11 +217,12 @@ export function computeCombo(
    */
   const pvEnergy = (y: number, extraSelfKwh: number, divertedKwh: number): number => {
     if (combo.pvKwp === 0) return 0
+    const cons = consumption(y)
     const gen = combo.pvKwp * s.pv.specificYieldKwhPerKwp * Math.pow(1 - s.pv.degradationPctPerYear / 100, y)
-    const baseSelf = Math.min(gen * (s.pv.selfConsumptionPct / 100), inv.power.consumptionKwh)
+    const baseSelf = Math.min(gen * (selfPct / 100), cons)
     const self = Math.min(baseSelf + extraSelfKwh, gen)
     let surplus = Math.max(gen - self - divertedKwh, 0)
-    const remainingGridKwh = Math.max(inv.power.consumptionKwh - baseSelf, 0)
+    const remainingGridKwh = Math.max(cons - baseSelf, 0)
     const battIn = Math.min(
       (battKwh * s.battery.cyclesPerYear) / s.battery.efficiency,
       surplus,
@@ -198,6 +257,7 @@ export function computeCombo(
   addItem('batteryEurPerKwh', `${s.battery.label} ${battKwh} kWh`, battCapex)
   if (wwSpec) addItem('wwCapexEur', WW_LABEL[combo.ww], ov.wwCapexEur ?? wwSpec.capexEur)
   if (combo.klima) addItem('klimaCapexEur', s.klima.label, ov.klimaCapexEur ?? s.klima.capexEur[tier])
+  if (combo.smart) addItem('smartCapexEur', s.smart.label, ov.smartCapexEur ?? s.smart.capexEur[tier])
   /** Zaehlerschrank & Co. — einmal, sobald irgendein Elektro-Baustein kommt */
   const needsElektro = combo.pvKwp > 0 || combo.heat === 'heatPump' || battKwh > 0 || combo.klima
   if (needsElektro) addItem('elektroCapexEur', s.elektro.label, ov.elektroCapexEur ?? s.elektro.capexEur[tier])
@@ -208,6 +268,16 @@ export function computeCombo(
   // --- Jahreskosten --------------------------------------------------------
   const yearCosts = (y: number): CostBreakdown => {
     const priceCt = esc(stromCt, inv.escalationPct.strom, y)
+    const hy = householdYear(inv, y)
+    // Warmwasser + Heizbedarf des Jahres (Familienmodell)
+    const wwCoveredKwh = wwSpec ? hy.wwKwh * (combo.pvKwp > 0 ? wwCoverPct / 100 : 1) : 0
+    const wwStromKwh = wwSpec ? wwCoveredKwh / wwSpec.cop : 0
+    const heatNeedKwh = heatingOnlyKwh + hy.wwKwh - wwCoveredKwh
+    const wpStromKwh = combo.heat === 'heatPump' ? heatNeedKwh / jaz : 0
+    const wpFromPvKwh = combo.heat === 'heatPump' && combo.pvKwp > 0 ? wpStromKwh * (wpCoverPct / 100) : 0
+    const klimaKwh = combo.klima ? s.klima.kwhPerYear : 0
+    const klimaPvKwh = combo.klima && combo.pvKwp > 0 ? klimaKwh * (klimaCoverPct / 100) : 0
+
     let energie = 0
     let betrieb = 0
     let eigenarbeit = 0
@@ -245,6 +315,10 @@ export function computeCombo(
       energie += (klimaPvKwh * fCt + (klimaKwh - klimaPvKwh) * priceCt) / 100
       betrieb += s.klima.maintenanceEur * mf
     }
+    if (sm) {
+      // eingesparter Haushaltsstrom (Lastmanagement, smarte Geraete)
+      energie -= (hy.stromKwh * (sm.householdSavingsPct / 100) * priceCt) / 100
+    }
     energie += pvEnergy(y, wpFromPvKwh, (wwSpec && combo.pvKwp > 0 ? wwStromKwh : 0) + klimaPvKwh)
     betrieb += pvOm(y)
 
@@ -277,17 +351,63 @@ export function computeCombo(
   }
 }
 
-export const STATUS_QUO: Combo = { heat: 'bestand', pvKwp: 0, batteryKwh: 0, ww: 'bestand', klima: false }
+export const STATUS_QUO: Combo = { heat: 'bestand', pvKwp: 0, batteryKwh: 0, ww: 'bestand', klima: false, smart: false }
 
 /** kuratierte Vergleichs-Kombinationen */
 export const PRESETS: Combo[] = [
-  { heat: 'woodNew', pvKwp: 0, batteryKwh: 0, ww: 'bestand', klima: false },
-  { heat: 'pellet', pvKwp: 0, batteryKwh: 0, ww: 'bestand', klima: false },
-  { heat: 'heatPump', pvKwp: 0, batteryKwh: 0, ww: 'bestand', klima: false },
-  { heat: 'bestand', pvKwp: 15, batteryKwh: 0, ww: 'bestand', klima: false },
-  { heat: 'heatPump', pvKwp: 15, batteryKwh: 10, ww: 'bestand', klima: false },
-  { heat: 'pellet', pvKwp: 15, batteryKwh: 0, ww: 'bwwp', klima: false },
+  { heat: 'woodNew', pvKwp: 0, batteryKwh: 0, ww: 'bestand', klima: false, smart: false },
+  { heat: 'pellet', pvKwp: 0, batteryKwh: 0, ww: 'bestand', klima: false, smart: false },
+  { heat: 'heatPump', pvKwp: 0, batteryKwh: 0, ww: 'bestand', klima: false, smart: false },
+  { heat: 'bestand', pvKwp: 15, batteryKwh: 0, ww: 'bestand', klima: false, smart: false },
+  { heat: 'heatPump', pvKwp: 15, batteryKwh: 10, ww: 'bestand', klima: false, smart: false },
+  { heat: 'pellet', pvKwp: 15, batteryKwh: 0, ww: 'bwwp', klima: false, smart: false },
 ]
+
+/**
+ * Faustregel Speichergroesse: ~0,8 kWh je kWp, gedeckelt durch den
+ * Jahresverbrauch (1 kWh je 1.000 kWh) — groessere Speicher werden im
+ * Winter nicht mehr voll und rechnen sich nicht. Gerundet auf die
+ * waehlbaren Stufen.
+ */
+export function recommendedBatteryKwh(pvKwp: number, consumptionKwh: number): number {
+  if (pvKwp <= 0) return 0
+  const ideal = Math.min(pvKwp * 0.8, consumptionKwh / 1000)
+  return [5, 10, 15].reduce((a, b) => (Math.abs(b - ideal) < Math.abs(a - ideal) ? b : a))
+}
+
+export interface Recommendation {
+  title: string
+  combo: Combo
+  why: string
+}
+
+/** erklaerte Gesamtpakete: Strom + Waerme (+ Klima) ganzheitlich gedacht */
+export function buildRecommendations(inv: InvestmentSettings): Recommendation[] {
+  const cons = inv.power.consumptionKwh
+  const b = (kwp: number) => recommendedBatteryKwh(kwp, cons)
+  return [
+    {
+      title: '🏆 Voll elektrisch — Strom & Wärme aus einer Hand',
+      combo: { heat: 'heatPump', pvKwp: 20, batteryKwh: b(20), ww: 'bestand', klima: false, smart: true },
+      why: `Wärmepumpe macht Heizung UND Warmwasser, die 20-kWp-PV liefert den Strom dafür, der ${b(20)}-kWh-Speicher (Faustregel ~0,8 kWh je kWp, gedeckelt vom Verbrauch) holt den Abend. Smart schiebt die WP in die Sonnenstunden. Kein Holz mehr — ${inv.heat.ownWorkHoursPerYear} h Eigenarbeit im Jahr frei.`,
+    },
+    {
+      title: '🌲 Pellet-Komfortpaket — Holzwärme, aber automatisch',
+      combo: { heat: 'pellet', pvKwp: 15, batteryKwh: b(15), ww: 'bwwp', klima: false, smart: true },
+      why: `Heizen bleibt günstige Holzenergie (Altbau-tauglich, keine Vorlauf-Sorgen), aber ohne Schleppen. Die Brauchwasser-WP macht Warmwasser im Sommer aus PV-Überschuss statt Kesselstart — wichtig mit 4 Kindern Richtung Teenager-Alter. Speicher ${b(15)} kWh passt zu 15 kWp.`,
+    },
+    {
+      title: '⚡ Strom zuerst — kleinster Schritt, sofortige Wirkung',
+      combo: { heat: 'bestand', pvKwp: 15, batteryKwh: b(15), ww: 'bestand', klima: false, smart: true },
+      why: `Der Kessel läuft, bis die Heizungsentscheidung fällt; PV + Speicher + Smart lohnen ab Tag 1 und sind die Basis für alles Weitere (WP, Klima, E-Auto). Aber: der KfW-Klimabonus für die Heizung sinkt ab 02/2027 — zu langes Warten kostet.`,
+    },
+    {
+      title: '🛋 Vollausbau + Komfort — alles, inklusive kühler Schlafzimmer',
+      combo: { heat: 'heatPump', pvKwp: 25, batteryKwh: b(25), ww: 'bestand', klima: true, smart: true },
+      why: `Maximale Dachbelegung, Wärmepumpe, Klima fürs Dachgeschoss (mit 4 Kindern in DG-Schlafzimmern der spürbarste Komfortgewinn — kühlt smart, wenn die Sonne liefert und kann übergangs auch heizen). Die teuerste, aber komplett zukunftsfeste Variante.`,
+    },
+  ]
+}
 
 /** Break-even und Horizont-Ersparnis relativ zum Status quo setzen */
 export function attachComparison(base: ComboResult, results: ComboResult[]): void {

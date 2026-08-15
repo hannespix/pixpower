@@ -9,8 +9,11 @@ import {
   STATUS_QUO,
   WW_LABEL,
   attachComparison,
+  buildRecommendations,
   comboKey,
   computeCombo,
+  householdYear,
+  recommendedBatteryKwh,
   type Combo,
   type ComboResult,
   type HeatKey,
@@ -22,12 +25,12 @@ import { chartTokens, deEmphasis, type Mode } from '../lib/palette'
 
 /** feste Farben je kuratierter Kombination; eigene Kombination = violett */
 const PRESET_COLOR: Record<string, { light: string; dark: string }> = {
-  'woodNew|0|0|bestand|-': { light: '#eb6834', dark: '#d95926' },
-  'pellet|0|0|bestand|-': { light: '#e87ba4', dark: '#d55181' },
-  'heatPump|0|0|bestand|-': { light: '#2a78d6', dark: '#3987e5' },
-  'bestand|15|0|bestand|-': { light: '#eda100', dark: '#c98500' },
-  'heatPump|15|10|bestand|-': { light: '#1baf7a', dark: '#199e70' },
-  'pellet|15|0|bwwp|-': { light: '#008300', dark: '#008300' },
+  'woodNew|0|0|bestand|-|-': { light: '#eb6834', dark: '#d95926' },
+  'pellet|0|0|bestand|-|-': { light: '#e87ba4', dark: '#d55181' },
+  'heatPump|0|0|bestand|-|-': { light: '#2a78d6', dark: '#3987e5' },
+  'bestand|15|0|bestand|-|-': { light: '#eda100', dark: '#c98500' },
+  'heatPump|15|10|bestand|-|-': { light: '#1baf7a', dark: '#199e70' },
+  'pellet|15|0|bwwp|-|-': { light: '#008300', dark: '#008300' },
 }
 const CUSTOM_COLOR = { light: '#4a3aa7', dark: '#9085e9' }
 
@@ -63,9 +66,11 @@ export function Invest() {
   const inv = bundle.investment
   const s = inv.scenarios
   const [tier, setTier] = useState<Tier>('typisch')
-  const [custom, setCustom] = useState<Combo>({ heat: 'pellet', pvKwp: 20, batteryKwh: 10, ww: 'bwwp', klima: false })
+  const [custom, setCustom] = useState<Combo>({ heat: 'pellet', pvKwp: 20, batteryKwh: 10, ww: 'bwwp', klima: false, smart: true })
   const [overrides, setOverrides] = useState<Partial<Record<OvKey, number>>>({})
-  const [tab, setTab] = useState<'verlauf' | 'jahr' | 'karten'>('verlauf')
+  const [tab, setTab] = useState<'verlauf' | 'jahr' | 'karten' | 'familie'>('verlauf')
+  const recommendations = useMemo(() => buildRecommendations(inv), [inv])
+  const recBattery = recommendedBatteryKwh(custom.pvKwp, inv.power.consumptionKwh)
 
   const heatSpec =
     custom.heat === 'woodNew' ? s.woodNew : custom.heat === 'pellet' ? s.pellet : custom.heat === 'heatPump' ? s.heatPump : null
@@ -123,6 +128,15 @@ export function Invest() {
       step: 250,
       market: s.klima.capexEur[tier],
     })
+  if (custom.smart)
+    sliders.push({
+      key: 'smartCapexEur',
+      label: 'Smart-Energiemanagement (HEMS + smarte Verzahnung)',
+      min: roundTo(s.smart.capexEur.guenstig * 0.5, 100),
+      max: roundTo(s.smart.capexEur.premium * 1.6, 100),
+      step: 100,
+      market: s.smart.capexEur[tier],
+    })
   if (needsElektro)
     sliders.push({
       key: 'elektroCapexEur',
@@ -154,6 +168,15 @@ export function Invest() {
     return { results, statusQuo, customResult: isDuplicate ? null : customResult, best }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inv, tier, custom, overrides])
+
+  const recResults = useMemo(() => {
+    const sq = computeCombo(inv, tier, STATUS_QUO)
+    return recommendations.map((rec) => {
+      const r = computeCombo(inv, tier, rec.combo)
+      attachComparison(sq, [sq, r])
+      return { rec, r }
+    })
+  }, [inv, tier, recommendations])
 
   const startYear = new Date().getFullYear()
   const H = inv.horizonYears
@@ -261,6 +284,44 @@ export function Invest() {
     })),
   }
 
+  // Familien-Verbrauchskurve ueber den Planungshorizont
+  const famYears = Array.from({ length: H + 1 }, (_, y) => householdYear(inv, y))
+  const famOption = {
+    ...baseOption(mode),
+    tooltip: {
+      ...(baseOption(mode).tooltip as object),
+      trigger: 'axis',
+      formatter: (ps: { dataIndex: number }[]) => {
+        const f = famYears[ps[0].dataIndex]
+        return `<strong>${f.year}</strong><br/>Haushaltsstrom: ${Math.round(f.stromKwh).toLocaleString('de-DE')} kWh<br/>Warmwasser: ${Math.round(f.wwKwh).toLocaleString('de-DE')} kWh th.<br/>${f.kidsAtHome} Kind(er) zu Hause, davon ${f.teens} Teenager`
+      },
+    },
+    legend: { top: 0, left: 0, icon: 'path://M0,6 L24,6 L24,10 L0,10 Z', itemWidth: 16, itemHeight: 8, textStyle: { color: t.textSecondary, fontSize: 12 } },
+    grid: { left: 8, right: 16, top: 40, bottom: 4, containLabel: true },
+    xAxis: { type: 'category', data: famYears.map((f) => String(f.year)), boundaryGap: false, ...ax.category },
+    yAxis: { type: 'value', ...ax.value },
+    series: [
+      {
+        name: 'Haushaltsstrom (kWh/a)',
+        type: 'line' as const,
+        data: famYears.map((f) => Math.round(f.stromKwh)),
+        lineStyle: { width: 2.5, color: mode === 'light' ? '#2a78d6' : '#3987e5' },
+        itemStyle: { color: mode === 'light' ? '#2a78d6' : '#3987e5' },
+        symbol: 'circle', symbolSize: 7, showSymbol: false,
+      },
+      {
+        name: 'Warmwasser thermisch (kWh/a)',
+        type: 'line' as const,
+        data: famYears.map((f) => Math.round(f.wwKwh)),
+        lineStyle: { width: 2.5, color: mode === 'light' ? '#1baf7a' : '#199e70' },
+        itemStyle: { color: mode === 'light' ? '#1baf7a' : '#199e70' },
+        symbol: 'circle', symbolSize: 7, showSymbol: false,
+      },
+    ],
+  }
+  const peak = famYears.reduce((a, b) => (b.wwKwh > a.wwKwh ? b : a))
+  const lastKidOut = famYears.find((f) => f.kidsAtHome === 0)
+
   const chipStyle = (active: boolean) =>
     ({
       borderColor: active ? 'var(--accent)' : 'var(--border)',
@@ -310,6 +371,48 @@ export function Invest() {
 
   return (
     <div className="space-y-4">
+      {/* Empfohlene Gesamtpakete */}
+      <details className="card no-print p-0" open>
+        <summary className="cursor-pointer select-none p-4 text-sm font-semibold">
+          🎯 Sinnvolle Gesamtpakete — erklärt{' '}
+          <span className="font-normal" style={{ color: 'var(--text-muted)' }}>
+            Strom + Wärme (+ Klima) ganzheitlich gedacht, mit passender Speichergröße; „übernehmen" lädt das Paket in den Baukasten
+          </span>
+        </summary>
+        <div className="grid gap-3 px-4 pb-4 lg:grid-cols-2">
+          {recResults.map(({ rec, r }) => {
+            const isCurrent = comboKey(rec.combo) === comboKey(custom)
+            return (
+              <div key={rec.title} className="flex flex-col rounded-lg border p-3" style={{ borderColor: isCurrent ? CUSTOM_COLOR[mode] : 'var(--grid)' }}>
+                <div className="text-sm font-semibold">{rec.title}</div>
+                <p className="mt-1 flex-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  {rec.why}
+                </p>
+                <div className="tabular mt-2 flex flex-wrap gap-x-4 gap-y-0.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  <span>Eigenanteil <strong style={{ color: 'var(--text-primary)' }}>{fmtEur(r.capexNet)}</strong></span>
+                  <span>Ø Jahreskosten <strong style={{ color: 'var(--text-primary)' }}>{fmtEur(r.equivalentAnnualCost)}</strong></span>
+                  <span>lohnt sich ab <strong style={{ color: 'var(--text-primary)' }}>{r.breakEvenYear !== null ? startYear + r.breakEvenYear : '–'}</strong></span>
+                  <span style={{ color: r.horizonSavings >= 0 ? 'var(--good-text)' : 'var(--critical)' }}>
+                    {H} J: {r.horizonSavings >= 0 ? '+' : ''}{fmtEur(r.horizonSavings)}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustom(rec.combo)
+                    setOverrides({})
+                  }}
+                  className="mt-2 self-start rounded-lg border px-2.5 py-1 text-xs font-medium"
+                  style={isCurrent ? { background: CUSTOM_COLOR[mode], color: '#fff', borderColor: CUSTOM_COLOR[mode] } : { borderColor: 'var(--baseline)' }}
+                >
+                  {isCurrent ? '✓ im Baukasten' : 'in den Baukasten übernehmen'}
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      </details>
+
       {/* Baukasten */}
       <div className="card no-print space-y-2.5 p-4">
         <h2 className="text-sm font-semibold">
@@ -331,12 +434,17 @@ export function Invest() {
           onChange={(v) => setCustom((c) => ({ ...c, pvKwp: Number(v) }))}
         />
         {custom.pvKwp > 0 && (
-          <Chips<`${number}`>
-            label="Speicher"
-            value={String(custom.batteryKwh) as `${number}`}
-            options={[['0', 'keiner'], ['5', '5 kWh'], ['10', '10 kWh'], ['15', '15 kWh']]}
-            onChange={(v) => setCustom((c) => ({ ...c, batteryKwh: Number(v) }))}
-          />
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Chips<`${number}`>
+              label="Speicher"
+              value={String(custom.batteryKwh) as `${number}`}
+              options={[['0', 'keiner'], ['5', '5 kWh'], ['10', '10 kWh'], ['15', '15 kWh']]}
+              onChange={(v) => setCustom((c) => ({ ...c, batteryKwh: Number(v) }))}
+            />
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              sinnvoll zu {custom.pvKwp} kWp: ~{recBattery} kWh (Faustregel 0,8 kWh/kWp, gedeckelt vom Verbrauch)
+            </span>
+          </div>
         )}
         <Chips<WwKey>
           label="Warmwasser"
@@ -350,6 +458,17 @@ export function Invest() {
           options={[['nein', 'ohne'], ['ja', '❄ Klimaanlage Schlafzimmer']]}
           onChange={(v) => setCustom((c) => ({ ...c, klima: v === 'ja' }))}
         />
+        <Chips<'ja' | 'nein'>
+          label="Smart"
+          value={custom.smart ? 'ja' : 'nein'}
+          options={[['nein', 'ohne'], ['ja', '🧠 Energiemanagement + Verzahnung']]}
+          onChange={(v) => setCustom((c) => ({ ...c, smart: v === 'ja' }))}
+        />
+        {custom.smart && (
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            {s.smart.note}
+          </p>
+        )}
         <Chips<Tier>
           label="Kostenstruktur"
           value={tier}
@@ -461,6 +580,7 @@ export function Invest() {
         {tabBtn('verlauf', 'Kostenverlauf & Break-even')}
         {tabBtn('jahr', 'Jahreskosten')}
         {tabBtn('karten', 'Vergleich im Detail')}
+        {tabBtn('familie', 'Familie & Verbrauch')}
       </div>
 
       {tab === 'verlauf' && (
@@ -495,6 +615,41 @@ export function Invest() {
                 custom={customResult !== null && r.key === customResult.key}
               />
             ))}
+        </div>
+      )}
+
+      {tab === 'familie' && (
+        <div className="card p-4">
+          <h2 className="mb-2 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+            Bedarfsentwicklung der Familie — alle Kombinationen rechnen mit diesen Kurven
+          </h2>
+          <EChart option={famOption} mode={mode} height={300} ariaLabel="Strom- und Warmwasserbedarf der Familie über den Planungshorizont" />
+          <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+            <ul className="list-disc space-y-1 pl-5" style={{ color: 'var(--text-secondary)' }}>
+              <li>
+                2 Erwachsene + 4 Kinder ({inv.household.kidBirthYears.map((by) => inv.household.referenceYear - by).join(', ')} Jahre) —
+                Teenager ab {inv.household.teenFromAge}, Auszug mit ~{inv.household.moveOutAge} angenommen
+              </li>
+              <li>
+                Pro Kopf und Jahr: Strom {inv.household.stromKwhPerChild}/{inv.household.stromKwhPerTeen}/{inv.household.stromKwhPerAdult} kWh,
+                Warmwasser {inv.household.wwKwhPerChild}/{inv.household.wwKwhPerTeen}/{inv.household.wwKwhPerAdult} kWh (Kind/Teenager/Erwachsene:r)
+              </li>
+              <li>Grundlast (Weingut, Sauna, Haus): ~{Math.round(famYears[0].baseKwh).toLocaleString('de-DE')} kWh/a konstant</li>
+            </ul>
+            <div style={{ color: 'var(--text-secondary)' }}>
+              <p>
+                <strong>Peak {peak.year}:</strong> {peak.teens} Teenager gleichzeitig — Warmwasser steigt auf ~
+                {Math.round(peak.wwKwh).toLocaleString('de-DE')} kWh th. ({Math.round((peak.wwKwh / famYears[0].wwKwh - 1) * 100)} % über heute).
+                Genau dann zahlt sich PV-Überschuss-Warmwasser (BWWP + Smart) aus.
+              </p>
+              {lastKidOut && (
+                <p className="mt-2">
+                  Ab ~{lastKidOut.year} sind alle Kinder ausgezogen — der Bedarf sinkt deutlich. Deshalb: Speicher nicht
+                  überdimensionieren und Systeme wählen, die auch bei kleinerem Haushalt effizient laufen.
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -544,6 +699,8 @@ export function Invest() {
                 : 'n/a'}{' '}
               — plausibel für teilsanierten Altbau</li>
             <li>Gebäude: Bj. 1889, EG unsaniert (1 m Bruchstein), DG 1998 isoliert → WP mit JAZ {inv.scenarios.heatPump.jaz} (+Struktur-Effekt) konservativ gerechnet</li>
+            <li>Familie: Strom- und Warmwasserbedarf je Planungsjahr aus dem Familienmodell (Reiter „Familie & Verbrauch") — Teenager-Peak und Auszug sind eingerechnet, in allen Kombinationen inkl. Status quo</li>
+            <li>Smart: hebt PV-Deckungsgrade nur für tatsächlich gewählte Bausteine (WP +{s.smart.wpPvCoverDeltaPp}, WW +{s.smart.wwPvCoverDeltaPp}, Klima +{s.smart.klimaPvCoverDeltaPp} %-Pkt., EV-Quote +{s.smart.selfConsumptionDeltaPp} %-Pkt.) und spart {s.smart.householdSavingsPct} % Haushaltsstrom</li>
             <li>Speicher: {s.battery.cyclesPerYear} Vollzyklen/a, {Math.round((1 - s.battery.efficiency) * 100)} % Verluste — verschiebt Überschuss in den Eigenverbrauch</li>
             <li>Klimaanlage: reiner Komfortbaustein ({s.klima.kwhPerYear} kWh/a Kühlstrom, {s.klima.pvCoverPct} % PV-gedeckt) — kostet, spart nichts</li>
             <li>Eigenarbeit: {inv.heat.ownWorkHoursPerYear} h/a à {fmtEur(inv.heat.ownWorkEurPerHour)} — macht „mehr Komfort" vergleichbar</li>
