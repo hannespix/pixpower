@@ -1,0 +1,90 @@
+@import 'tailwindcss';
+
+/* Design-Tokens (dataviz-Referenzpalette): Light ist der Default,
+   Dark wird ueber prefers-color-scheme ausgewaehlt — eigene Stufen,
+   kein automatischer Invert. */
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --grid: #e1e0d9;
+  --baseline: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+  --accent: #2a78d6;
+  --good-text: #006300;
+  --critical: #d03b3b;
+
+  --s-strom: #2a78d6;
+  --s-holz: #eb6834;
+  --s-wasser: #1baf7a;
+  --s-abwasser: #eda100;
+  --s-kaminkehrer: #e87ba4;
+  --s-wartung: #008300;
+  --s-sonstiges: #4a3aa7;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.1);
+    --accent: #3987e5;
+    --good-text: #0ca30c;
+    --critical: #d03b3b;
+
+    --s-strom: #3987e5;
+    --s-holz: #d95926;
+    --s-wasser: #199e70;
+    --s-abwasser: #c98500;
+    --s-kaminkehrer: #d55181;
+    --s-wartung: #008300;
+    --s-sonstiges: #9085e9;
+  }
+}
+
+html {
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+body {
+  background: var(--page);
+  color: var(--text-primary);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Druck: Navigation/Filter ausblenden, Karten flach, Seitenumbrueche sauber */
+@media print {
+  :root {
+    color-scheme: light;
+    --page: #ffffff;
+    --surface: #ffffff;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .card {
+    border: 1px solid #ddd;
+    break-inside: avoid;
+  }
+  body {
+    background: #fff;
+  }
+}
