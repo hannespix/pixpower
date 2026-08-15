@@ -21,6 +21,7 @@ const bundle = bundleSchema.parse({
   settings: read('settings.json'),
   invoices: read('invoices.json'),
   readings: read('readings.json'),
+  investment: read('investment.json'),
   generatedAt: new Date().toISOString(),
 })
 
