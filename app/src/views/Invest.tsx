@@ -595,6 +595,59 @@ export function Invest() {
         </p>
       </div>
 
+      {/* Szenarien im Ueberblick — immer sichtbar */}
+      <div className="card overflow-x-auto p-4">
+        <h2 className="mb-2 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+          Szenarien im Überblick — Investition, monatliche Ersparnis im Betrieb, Break-even
+        </h2>
+        <table className="w-full text-sm" style={{ minWidth: '620px' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid var(--baseline)' }}>
+              <th className="py-1.5 pr-3 text-left font-medium" style={{ color: 'var(--text-secondary)' }}>Szenario</th>
+              <th className="px-2 py-1.5 text-right font-medium" style={{ color: 'var(--text-secondary)' }}>Investition<br /><span className="font-normal">(Eigenanteil)</span></th>
+              <th className="px-2 py-1.5 text-right font-medium" style={{ color: 'var(--text-secondary)' }}>Ersparnis / Monat<br /><span className="font-normal">(Betrieb, ohne Kapital)</span></th>
+              <th className="px-2 py-1.5 text-right font-medium" style={{ color: 'var(--text-secondary)' }}>Break-even</th>
+              <th className="py-1.5 pl-2 text-right font-medium" style={{ color: 'var(--text-secondary)' }}>{H}-J-Bilanz</th>
+            </tr>
+          </thead>
+          <tbody className="tabular">
+            {[...results]
+              .filter((r) => r.key !== statusQuo.key)
+              .sort((a, b) => b.horizonSavings - a.horizonSavings)
+              .map((r) => {
+                const oper = (x: ComboResult) => x.breakdown.energie + x.breakdown.betrieb + x.breakdown.eigenarbeit
+                const perMonth = (oper(statusQuo) - oper(r)) / 12
+                const isBest = r.key === best.key
+                const isCustom = customResult !== null && r.key === customResult.key
+                return (
+                  <tr key={r.key} style={{ borderBottom: '1px solid var(--grid)', background: isBest || isCustom ? 'color-mix(in srgb, var(--accent) 6%, transparent)' : undefined }}>
+                    <td className="py-1.5 pr-3">
+                      <span className="flex items-center gap-2">
+                        <span aria-hidden className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: comboColor(r.key, mode) }} />
+                        <span className={isBest || isCustom ? 'font-semibold' : undefined}>{r.label}</span>
+                        {isBest && <span className="shrink-0 rounded-full px-1.5 text-xs font-medium text-white" style={{ background: 'var(--accent)' }}>beste</span>}
+                        {isCustom && <span className="shrink-0 rounded-full px-1.5 text-xs font-medium text-white" style={{ background: CUSTOM_COLOR[mode] }}>deine</span>}
+                      </span>
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-medium">{fmtEur(r.capexNet)}</td>
+                    <td className="px-2 py-1.5 text-right font-semibold" style={{ color: perMonth > 0 ? 'var(--good-text)' : 'var(--critical)' }}>
+                      {perMonth >= 0 ? '+' : ''}{fmtEur(perMonth)}
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-semibold">{r.breakEvenYear !== null ? startYear + r.breakEvenYear : '—'}</td>
+                    <td className="py-1.5 pl-2 text-right" style={{ color: r.horizonSavings > 0 ? 'var(--good-text)' : 'var(--critical)' }}>
+                      {r.horizonSavings >= 0 ? '+' : ''}{fmtEur(r.horizonSavings)}
+                    </td>
+                  </tr>
+                )
+              })}
+          </tbody>
+        </table>
+        <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+          Ersparnis/Monat = laufende Kosten des Status quo ({fmtEur((statusQuo.breakdown.energie + statusQuo.breakdown.betrieb + statusQuo.breakdown.eigenarbeit) / 12)}/Monat inkl. bewerteter Eigenarbeit)
+          minus laufende Kosten des Szenarios — daraus zahlt sich die Investition ab; ab dem Break-even-Jahr ist sie drin.
+        </p>
+      </div>
+
       {/* Reiter fuer die drei Sichten */}
       <div className="no-print flex gap-1 rounded-full border p-1" style={{ borderColor: 'var(--border)', background: 'var(--surface)', width: 'fit-content' }}>
         {tabBtn('verlauf', 'Kostenverlauf & Break-even')}
