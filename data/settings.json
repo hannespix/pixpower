@@ -1,11 +1,10 @@
 {
   "house": {
-    "name": "Wohnhaus",
-    "location": "Deutschland",
-    "heatedAreaM2": 160,
-    "heatingSystem": "Holzscheitvergaser (Bj. ~1996) + Solarthermie"
+    "name": "Wohnhaus & Weingut",
+    "location": "Südbaden",
+    "heatingSystem": "Holzscheitvergaser (~30 Jahre) + Solarthermie"
   },
-  "demoData": true,
+  "demoData": false,
   "woodSpreadMonths": 12,
   "hddProfile": [0.17, 0.14, 0.12, 0.08, 0.03, 0.01, 0.01, 0.01, 0.03, 0.09, 0.14, 0.17],
   "hddProfileNote": "Monatsanteile der Jahresheizarbeit (Gradtagzahlen, langjaehriges Mittel Deutschland). Summe = 1. Wird zur Periodisierung von Waermekosten verwendet."
