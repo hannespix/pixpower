@@ -1,60 +1,5 @@
 [
   {
-    "id": "2024-strom-ews-abrechnung",
-    "category": "strom",
-    "kind": "abrechnung",
-    "vendor": "EWS Schönau",
-    "date": "2024-05-21",
-    "periodStart": "2023-03-09",
-    "periodEnd": "2024-04-10",
-    "amountEur": 5167.49,
-    "quantity": 13175,
-    "unit": "kWh",
-    "note": "Verbrauchsabrechnung EWS OEKO (2023: 37,7 ct/kWh brutto, ab 2024: 33,6 ct/kWh). 13 Monate Abrechnungszeitraum.",
-    "sourceFile": "2024-05-21 0_Lieferanten EWS stromabrechnung.pdf"
-  },
-  {
-    "id": "2025-strom-ews-abrechnung",
-    "category": "strom",
-    "kind": "abrechnung",
-    "vendor": "EWS Schönau",
-    "date": "2025-05-19",
-    "periodStart": "2024-04-11",
-    "periodEnd": "2025-03-31",
-    "amountEur": 4120.84,
-    "quantity": 12049,
-    "unit": "kWh",
-    "note": "Verbrauchsabrechnung EWS OEKO, effektiv 34,2 ct/kWh brutto.",
-    "sourceFile": "2025-05-19 0_Lieferanten Verbrauchsabrechnung Strom DR-8408001.pdf"
-  },
-  {
-    "id": "2025-strom-badenova-schlussabrechnung",
-    "category": "strom",
-    "kind": "abrechnung",
-    "vendor": "badenova Energie",
-    "date": "2025-12-03",
-    "periodStart": "2025-09-01",
-    "periodEnd": "2025-11-27",
-    "amountEur": 1040.35,
-    "quantity": 2808,
-    "unit": "kWh",
-    "note": "Schlussabrechnung Oekostrom PUR Ersatzversorgung (37,0 ct/kWh brutto). Vertrag gekuendigt zum 27.11.2025, inkl. Zaehlertausch Anfang Oktober.",
-    "sourceFile": "2025-12-03 0_Lieferanten Ihre Schlussabrechnung für Strom.pdf"
-  },
-  {
-    "id": "2026-strom-schwarzwald-abschlaege",
-    "category": "strom",
-    "kind": "abschlag",
-    "vendor": "schwarzwald energy",
-    "date": "2025-12-11",
-    "periodStart": "2025-11-28",
-    "periodEnd": "2026-11-27",
-    "amountEur": 2761,
-    "note": "Tarif 'schwarzwald strom flex - IMS' ab 28.11.2025. 11 Abschlaege a 251 EUR brutto (faellig 25.01.-25.11.2026). Korrigiertes Begruessungsschreiben vom 11.12.2025 ersetzt das vom 10.12.2025 (dort fehlerhaft 13 EUR).",
-    "sourceFile": "2025-12-11 0_Lieferanten Begrüßungsschreiben.pdf"
-  },
-
-  {
     "id": "2022-10-holz",
     "category": "holz",
     "kind": "einkauf",
@@ -77,6 +22,106 @@
     "unit": "ster",
     "note": "Brennholz 50 cm, 90 EUR/Ster netto.",
     "sourceFile": "2022-12-22 0_Lieferanten Rechnung Nr. 2022-80 vom 22.12.2022.pdf"
+  },
+  {
+    "id": "2022-wasser-abrechnung",
+    "category": "wasser",
+    "kind": "abrechnung",
+    "vendor": "Gemeinde Ihringen",
+    "date": "2023-01-03",
+    "periodStart": "2021-12-07",
+    "periodEnd": "2022-12-09",
+    "amountEur": 865.33,
+    "quantity": 284,
+    "unit": "m3",
+    "note": "Jahresendabrechnung 2022: 2,78 EUR/m3 netto + Grundgebuehr, 7% USt.",
+    "sourceFile": "2023-01-03 0_Behörden Jahresendabrechnung 2022 für Wasser und Abwasser.pdf"
+  },
+  {
+    "id": "2022-abwasser-abrechnung",
+    "category": "abwasser",
+    "kind": "abrechnung",
+    "vendor": "Gemeinde Ihringen",
+    "date": "2023-01-03",
+    "periodStart": "2021-12-07",
+    "periodEnd": "2022-12-09",
+    "amountEur": 787.12,
+    "quantity": 284,
+    "unit": "m3",
+    "note": "Schmutzwasser 2,24 EUR/m3 (636,16) + Niederschlagswasser 444 qm (150,96).",
+    "sourceFile": "2023-01-03 0_Behörden Jahresendabrechnung 2022 für Wasser und Abwasser.pdf"
+  },
+  {
+    "id": "2023-wasser-abschlag",
+    "category": "wasser",
+    "kind": "abschlag",
+    "vendor": "Gemeinde Ihringen",
+    "date": "2023-03-31",
+    "periodStart": "2022-12-10",
+    "periodEnd": "2023-12-09",
+    "amountEur": 642.0,
+    "note": "3 Abschlaege a 214 EUR (31.03./30.06./30.09.2023) laut Bescheid. Jahresabrechnung 2023 fehlt noch - bitte nachreichen.",
+    "sourceFile": "2023-01-03 0_Behörden Jahresendabrechnung 2022 für Wasser und Abwasser.pdf"
+  },
+  {
+    "id": "2023-abwasser-abschlag",
+    "category": "abwasser",
+    "kind": "abschlag",
+    "vendor": "Gemeinde Ihringen",
+    "date": "2023-03-31",
+    "periodStart": "2022-12-10",
+    "periodEnd": "2023-12-09",
+    "amountEur": 585.0,
+    "note": "3 Abschlaege a 195 EUR laut Bescheid. Jahresabrechnung 2023 fehlt noch.",
+    "sourceFile": "2023-01-03 0_Behörden Jahresendabrechnung 2022 für Wasser und Abwasser.pdf"
+  },
+  {
+    "id": "2024-wasser-abschlag",
+    "category": "wasser",
+    "kind": "abschlag",
+    "vendor": "Gemeinde Ihringen",
+    "date": "2024-04-02",
+    "periodStart": "2023-12-10",
+    "periodEnd": "2024-12-09",
+    "amountEur": 639.09,
+    "note": "Zahlungen laut Kontoauszuegen (Apr/Jul/Sep 2024, 871 EUR gesamt) plus Nachzahlung 348,64 EUR vom 21.01.2025; Aufteilung Wasser/Abwasser geschaetzt im Verhaeltnis 2022 (52,4/47,6). Bescheide 2023+2024 fehlen - bitte nachreichen.",
+    "sourceFile": "2024-05-01 Sparkasse Freiburg Kontoauszug 4-2024 für Hannes Pix.pdf"
+  },
+  {
+    "id": "2024-abwasser-abschlag",
+    "category": "abwasser",
+    "kind": "abschlag",
+    "vendor": "Gemeinde Ihringen",
+    "date": "2024-04-02",
+    "periodStart": "2023-12-10",
+    "periodEnd": "2024-12-09",
+    "amountEur": 580.55,
+    "note": "Siehe 2024-wasser-abschlag - Aufteilung geschaetzt, Bescheid fehlt.",
+    "sourceFile": "2024-05-01 Sparkasse Freiburg Kontoauszug 4-2024 für Hannes Pix.pdf"
+  },
+  {
+    "id": "2024-kaminkehrer-kehren",
+    "category": "kaminkehrer",
+    "kind": "einzel",
+    "vendor": "Schornsteinfeger Klingenberg",
+    "date": "2024-05-17",
+    "amountEur": 65.97,
+    "note": "Kehren. Rechnung 28.05.2024, Arbeit 17.05.2024.",
+    "sourceFile": "2024-05-28 0_Handwerker Rechnung Nr. 1077-2024 von Uwe Klingenberg.pdf"
+  },
+  {
+    "id": "2024-strom-ews-abrechnung",
+    "category": "strom",
+    "kind": "abrechnung",
+    "vendor": "EWS Schönau",
+    "date": "2024-05-21",
+    "periodStart": "2023-03-09",
+    "periodEnd": "2024-04-10",
+    "amountEur": 5167.49,
+    "quantity": 13175,
+    "unit": "kWh",
+    "note": "Verbrauchsabrechnung EWS OEKO (2023: 37,7 ct/kWh brutto, ab 2024: 33,6 ct/kWh). 13 Monate Abrechnungszeitraum.",
+    "sourceFile": "2024-05-21 0_Lieferanten EWS stromabrechnung.pdf"
   },
   {
     "id": "2024-09-holz",
@@ -103,6 +148,18 @@
     "sourceFile": "2024-11-17 0_Lieferanten Rechnung 2024-194 – Brennholz.pdf"
   },
   {
+    "id": "2025-01-holz",
+    "category": "holz",
+    "kind": "einkauf",
+    "vendor": "Forstbetrieb Hänsler & Nowack",
+    "date": "2025-01-29",
+    "amountEur": 520.02,
+    "quantity": 4,
+    "unit": "ster",
+    "note": "Rechnung RE2025019, nur ueber Kontoauszug belegt (Zahlung 29.01.2025) - Rechnungs-PDF fehlt.",
+    "sourceFile": "2025-02-01 Sparkasse Freiburg Konto_0010039322-Auszug_2025_0001.pdf"
+  },
+  {
     "id": "2025-02-holz",
     "category": "holz",
     "kind": "einkauf",
@@ -115,6 +172,16 @@
     "sourceFile": "2025-02-06 0_Lieferanten Rechnung RE2025038 vom 06.02.2025.pdf"
   },
   {
+    "id": "2025-kaminkehrer-messung",
+    "category": "kaminkehrer",
+    "kind": "einzel",
+    "vendor": "Schornsteinfeger Klingenberg",
+    "date": "2025-02-10",
+    "amountEur": 150.82,
+    "note": "Feststoffmessung nach 1. BImSchV (alle 2 Jahre), Messung 10.02.2025. Ergebnis: 0,8 g/m3 CO bei Grenzwert 1,0 - bestanden, aber grenzwertig.",
+    "sourceFile": "2025-02-23 0_Behörden Rechnung Nr. 373-2025 von Uwe Klingenberg.pdf"
+  },
+  {
     "id": "2025-03-holz",
     "category": "holz",
     "kind": "einkauf",
@@ -125,6 +192,20 @@
     "unit": "ster",
     "note": "Brennholz 50 cm.",
     "sourceFile": "2025-03-19 0_Lieferanten Rechnung RE2025073 von Forstbetrieb Hänsler & Nowack.pdf"
+  },
+  {
+    "id": "2025-strom-ews-abrechnung",
+    "category": "strom",
+    "kind": "abrechnung",
+    "vendor": "EWS Schönau",
+    "date": "2025-05-19",
+    "periodStart": "2024-04-11",
+    "periodEnd": "2025-03-31",
+    "amountEur": 4120.84,
+    "quantity": 12049,
+    "unit": "kWh",
+    "note": "Verbrauchsabrechnung EWS OEKO, effektiv 34,2 ct/kWh brutto.",
+    "sourceFile": "2025-05-19 0_Lieferanten Verbrauchsabrechnung Strom DR-8408001.pdf"
   },
   {
     "id": "2025-09-holz",
@@ -161,6 +242,32 @@
     "unit": "ster",
     "note": "4 Ster 50 cm + 1 Ster 25 cm.",
     "sourceFile": "2025-11-26 0_Lieferanten Rechnung RE2025257.pdf"
+  },
+  {
+    "id": "2025-strom-badenova-schlussabrechnung",
+    "category": "strom",
+    "kind": "abrechnung",
+    "vendor": "badenova Energie",
+    "date": "2025-12-03",
+    "periodStart": "2025-09-01",
+    "periodEnd": "2025-11-27",
+    "amountEur": 1040.35,
+    "quantity": 2808,
+    "unit": "kWh",
+    "note": "Schlussabrechnung Oekostrom PUR Ersatzversorgung (37,0 ct/kWh brutto). Vertrag gekuendigt zum 27.11.2025, inkl. Zaehlertausch Anfang Oktober.",
+    "sourceFile": "2025-12-03 0_Lieferanten Ihre Schlussabrechnung für Strom.pdf"
+  },
+  {
+    "id": "2026-strom-schwarzwald-abschlaege",
+    "category": "strom",
+    "kind": "abschlag",
+    "vendor": "schwarzwald energy",
+    "date": "2025-12-11",
+    "periodStart": "2025-11-28",
+    "periodEnd": "2026-11-27",
+    "amountEur": 2761,
+    "note": "Tarif 'schwarzwald strom flex - IMS' ab 28.11.2025. 11 Abschlaege a 251 EUR brutto (faellig 25.01.-25.11.2026). Korrigiertes Begruessungsschreiben vom 11.12.2025 ersetzt das vom 10.12.2025 (dort fehlerhaft 13 EUR).",
+    "sourceFile": "2025-12-11 0_Lieferanten Begrüßungsschreiben.pdf"
   },
   {
     "id": "2025-12-holz",
