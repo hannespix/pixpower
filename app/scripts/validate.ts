@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
-import { invoiceSchema, readingSchema, settingsSchema } from '../src/lib/schema'
+import { invoiceSchema, investmentSchema, readingSchema, settingsSchema } from '../src/lib/schema'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 let failed = false
@@ -34,6 +34,7 @@ function check<T>(file: string, schema: z.ZodType<T>): T | undefined {
 }
 
 check('settings.json', settingsSchema)
+check('investment.json', investmentSchema)
 const invoices = check('invoices.json', z.array(invoiceSchema))
 const readings = check('readings.json', z.array(readingSchema))
 

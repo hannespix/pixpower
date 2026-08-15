@@ -117,10 +117,108 @@ export const settingsSchema = z.object({
 
 export type Settings = z.infer<typeof settingsSchema>
 
+const tierEur = z.object({
+  guenstig: z.number().positive(),
+  typisch: z.number().positive(),
+  premium: z.number().positive(),
+})
+
+export type Tier = 'guenstig' | 'typisch' | 'premium'
+
+/** Parameter der Investitionsplanung — data/investment.json, editierbar per PR */
+export const investmentSchema = z.object({
+  note: z.string().optional(),
+  horizonYears: z.number().int().min(5).max(40).default(20),
+  interestRatePct: z.number().min(0).max(15),
+  escalationPct: z.object({
+    strom: z.number(),
+    holz: z.number(),
+    pellet: z.number(),
+    einspeisung: z.number(),
+  }),
+  heat: z.object({
+    sterPerYear: z.number().positive(),
+    eurPerSter: z.number().positive(),
+    kwhPerSter: z.number().positive(),
+    oldBoilerEfficiency: z.number().min(0.3).max(1),
+    ownWorkHoursPerYear: z.number().nonnegative(),
+    ownWorkEurPerHour: z.number().nonnegative(),
+    maintenanceOldEur: z.number().nonnegative(),
+    kaminkehrerEur: z.number().nonnegative(),
+    note: z.string().optional(),
+  }),
+  power: z.object({
+    consumptionKwh: z.number().positive(),
+    pricePerKwhCt: z.number().positive(),
+    note: z.string().optional(),
+  }),
+  scenarios: z.object({
+    woodNew: z.object({
+      label: z.string(),
+      efficiency: z.number().min(0.5).max(1),
+      capexEur: tierEur,
+      subsidyPct: z.number().min(0).max(80),
+      subsidyCapEur: z.number().nonnegative(),
+      subsidyExtraEur: z.number().nonnegative(),
+      maintenanceEur: z.number().nonnegative(),
+      kaminkehrerEur: z.number().nonnegative(),
+      ownWorkFactor: z.number().min(0).max(2),
+      note: z.string().optional(),
+    }),
+    pellet: z.object({
+      label: z.string(),
+      efficiency: z.number().min(0.5).max(1),
+      eurPerTon: z.number().positive(),
+      kwhPerKg: z.number().positive(),
+      capexEur: tierEur,
+      subsidyPct: z.number().min(0).max(80),
+      subsidyCapEur: z.number().nonnegative(),
+      subsidyExtraEur: z.number().nonnegative(),
+      maintenanceEur: z.number().nonnegative(),
+      kaminkehrerEur: z.number().nonnegative(),
+      ownWorkHoursPerYear: z.number().nonnegative(),
+      note: z.string().optional(),
+    }),
+    heatPump: z.object({
+      label: z.string(),
+      jaz: z.number().min(1.5).max(6),
+      capexEur: tierEur,
+      subsidyPct: z.number().min(0).max(80),
+      subsidyCapEur: z.number().nonnegative(),
+      subsidyExtraEur: z.number().nonnegative(),
+      maintenanceEur: z.number().nonnegative(),
+      kaminkehrerEur: z.number().nonnegative(),
+      note: z.string().optional(),
+    }),
+    pv: z.object({
+      label: z.string(),
+      kwp: z.number().positive(),
+      specificYieldKwhPerKwp: z.number().positive(),
+      capexPerKwp: tierEur,
+      selfConsumptionPct: z.number().min(0).max(100),
+      feedInCtPerKwh: z.number().nonnegative(),
+      omPctOfCapex: z.number().nonnegative(),
+      inverterReplaceYear: z.number().int().positive(),
+      inverterCostEur: z.number().nonnegative(),
+      degradationPctPerYear: z.number().min(0).max(2),
+      note: z.string().optional(),
+    }),
+    pvHeatPump: z.object({
+      label: z.string(),
+      wpPvCoverPct: z.number().min(0).max(100),
+      note: z.string().optional(),
+    }),
+  }),
+  subsidyNote: z.string().optional(),
+})
+
+export type InvestmentSettings = z.infer<typeof investmentSchema>
+
 export const bundleSchema = z.object({
   settings: settingsSchema,
   invoices: z.array(invoiceSchema),
   readings: z.array(readingSchema),
+  investment: investmentSchema,
   generatedAt: z.string(),
 })
 

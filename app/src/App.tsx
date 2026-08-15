@@ -6,6 +6,7 @@ import { Records } from './views/Records'
 import { Entry } from './views/Entry'
 import { Report } from './views/Report'
 import { Quality } from './views/Quality'
+import { Invest } from './views/Invest'
 import { dataQualityIssues } from './lib/engine'
 
 export default function App() {
@@ -36,6 +37,7 @@ function Shell() {
         <nav className="flex gap-1 rounded-full border p-1" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
           {[
             ['/', 'Übersicht'],
+            ['/invest', 'Invest'],
             ['/belege', 'Belege'],
             ['/daten', 'Daten'],
             ['/erfassen', 'Erfassen'],
@@ -80,6 +82,7 @@ function Shell() {
       <Routes>
         <Route path="/" element={<Overview />} />
         <Route path="/belege" element={<Records />} />
+        <Route path="/invest" element={<Invest />} />
         <Route path="/daten" element={<Quality />} />
         <Route path="/erfassen" element={<Entry />} />
         <Route path="/bericht" element={<Report />} />
