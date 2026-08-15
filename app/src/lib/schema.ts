@@ -152,6 +152,21 @@ export const investmentSchema = z.object({
     pricePerKwhCt: z.number().positive(),
     note: z.string().optional(),
   }),
+  /** Familien-Verbrauchsmodell: Personenbedarf nach Alter, dynamisch je Planungsjahr */
+  household: z.object({
+    referenceYear: z.number().int().min(2020).max(2100),
+    adults: z.number().int().nonnegative(),
+    kidBirthYears: z.array(z.number().int()),
+    teenFromAge: z.number().int().min(8).max(18),
+    moveOutAge: z.number().int().min(16).max(35),
+    stromKwhPerAdult: z.number().nonnegative(),
+    stromKwhPerChild: z.number().nonnegative(),
+    stromKwhPerTeen: z.number().nonnegative(),
+    wwKwhPerAdult: z.number().nonnegative(),
+    wwKwhPerChild: z.number().nonnegative(),
+    wwKwhPerTeen: z.number().nonnegative(),
+    note: z.string().optional(),
+  }),
   scenarios: z.object({
     woodNew: z.object({
       label: z.string(),
@@ -226,6 +241,16 @@ export const investmentSchema = z.object({
     elektro: z.object({
       label: z.string(),
       capexEur: tierEur,
+      note: z.string().optional(),
+    }),
+    smart: z.object({
+      label: z.string(),
+      capexEur: tierEur,
+      selfConsumptionDeltaPp: z.number().min(0).max(40),
+      wpPvCoverDeltaPp: z.number().min(0).max(50),
+      wwPvCoverDeltaPp: z.number().min(0).max(50),
+      klimaPvCoverDeltaPp: z.number().min(0).max(50),
+      householdSavingsPct: z.number().min(0).max(20),
       note: z.string().optional(),
     }),
   }),

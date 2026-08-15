@@ -24,6 +24,20 @@
     "pricePerKwhCt": 26.0,
     "note": "Verbrauch aus Zaehlerstaenden (~12.000 kWh/a inkl. Weingut), Preis aus schwarzwald-energy-Abschlaegen 2026."
   },
+  "household": {
+    "referenceYear": 2026,
+    "adults": 2,
+    "kidBirthYears": [2015, 2016, 2019, 2022],
+    "teenFromAge": 12,
+    "moveOutAge": 21,
+    "stromKwhPerAdult": 500,
+    "stromKwhPerChild": 300,
+    "stromKwhPerTeen": 650,
+    "wwKwhPerAdult": 600,
+    "wwKwhPerChild": 500,
+    "wwKwhPerTeen": 800,
+    "note": "6-koepfige Familie: 2 Erwachsene + 4 Kinder (2026: 11/10/7/4 J.). Personenbedarf nach Alter: Teenager (ab 12) duschen laenger und haben mehr Geraete; Auszug mit ~21 angenommen. Der Rest des gemessenen Verbrauchs (~9.400 kWh) ist Grundlast: Weingut, Sauna, Haus. Strom- und Warmwasserbedarf werden je Planungsjahr daraus dynamisch berechnet — Teenager-Peak ~2029-2035, danach sinkender Bedarf."
+  },
   "scenarios": {
     "woodNew": {
       "label": "Neuer Scheitholzvergaser",
@@ -127,6 +141,20 @@
         "premium": 4000
       },
       "note": "Zaehlerschrank-Umbau, Leitungen, Netzanmeldung — faellt einmal an, sobald PV, Waermepumpe, Speicher oder Klima kommen. Grobe Schaetzung, per Regler ans echte Angebot anpassen."
+    },
+    "smart": {
+      "label": "Smart-Energiemanagement",
+      "capexEur": {
+        "guenstig": 800,
+        "typisch": 1500,
+        "premium": 2500
+      },
+      "selfConsumptionDeltaPp": 7,
+      "wpPvCoverDeltaPp": 10,
+      "wwPvCoverDeltaPp": 15,
+      "klimaPvCoverDeltaPp": 20,
+      "householdSavingsPct": 4,
+      "note": "Energiemanager (HEMS) + smarte Verzahnung der gewaehlten Systeme: WP laeuft SG-Ready in den Sonnenstunden (+10 %-Pkt. PV-Deckung), Warmwasser wird ueberschussgesteuert (+15 %-Pkt.), Klima kuehlt vor, wenn die Sonne scheint (+20 %-Pkt.), smarte Geraete/Lastverschiebung heben die Eigenverbrauchsquote (+7 %-Pkt.) und sparen ~4 % Haushaltsstrom. Wirkt nur auf tatsaechlich gewaehlte Bausteine."
     }
   },
   "subsidyNote": "KfW 458 (Stand 08/2026): 30% Grundfoerderung + 16% Klimageschwindigkeitsbonus (sinkt ab 02/2027 alle 6 Monate um 4 Punkte!) auf max. 28.000 EUR foerderfaehige Kosten. Einkommensbonus +30% bei zu versteuerndem Haushaltseinkommen <= 40.000 EUR nicht eingerechnet. PV: 0% MwSt, EEG-Verguetung 20 Jahre garantiert.",

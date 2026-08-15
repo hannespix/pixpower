@@ -3,6 +3,7 @@ import { useData } from '../state/DataProvider'
 import { useTheme } from '../hooks/useTheme'
 import { fmtEur, summarizeYear, totalOfMonth, yearlyConsumption, yearsWithData } from '../lib/engine'
 import { CATEGORIES, CATEGORY_LABEL, type Category } from '../lib/schema'
+import { exportExcel } from '../lib/excel'
 
 const MONTH_LABELS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember']
 
@@ -112,6 +113,15 @@ export function Report() {
             style={{ background: 'var(--accent)' }}
           >
             Drucken / Als PDF speichern
+          </button>
+          <button
+            type="button"
+            onClick={() => void exportExcel(bundle, monthly)}
+            className="rounded-lg border px-3 py-1.5 text-sm font-medium"
+            style={{ borderColor: 'var(--baseline)' }}
+            title="Mehrere Sheets: Jahresübersicht, Monatskosten (belegt/geschätzt getrennt), alle Belege mit Autofilter, Zählerstände + Jahresverbrauch, Methodik"
+          >
+            Excel-Export (.xlsx)
           </button>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
