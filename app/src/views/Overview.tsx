@@ -19,10 +19,12 @@ export function Overview() {
     years.includes(currentYear) ? currentYear : years[years.length - 1],
   )
   const [activeCats, setActiveCats] = useState<Set<Category>>(new Set(CATEGORIES))
+  /** Beleg-Luecken mit Schaetzwerten fuellen (transparent markiert) */
+  const [withEst, setWithEst] = useState(true)
 
   const cats = CATEGORIES.filter((c) => activeCats.has(c))
-  const summary = useMemo(() => summarizeYear(monthly, year), [monthly, year])
-  const prev = useMemo(() => summarizeYear(monthly, year - 1), [monthly, year])
+  const summary = useMemo(() => summarizeYear(monthly, year, withEst), [monthly, year, withEst])
+  const prev = useMemo(() => summarizeYear(monthly, year - 1, withEst), [monthly, year, withEst])
 
   const filteredTotal = cats.reduce((s, c) => s + summary.perCategory[c], 0)
   const filteredPrevTotal = cats.reduce((s, c) => s + prev.perCategory[c], 0)
@@ -51,14 +53,33 @@ export function Overview() {
   // --- Chart 1: gestapelte Monatssaeulen -----------------------------------
   const monthKeys = MONTH_LABELS.map((_, i) => `${year}-${String(i + 1).padStart(2, '0')}`)
   const monthRecs = monthKeys.map((k) => monthly.months.get(k))
-  const monthTotals = monthRecs.map((r) => (r ? cats.reduce((s, c) => s + r[c], 0) : 0))
+  const monthEsts = monthKeys.map((k) => (withEst ? monthly.estimated.get(k) : undefined))
+  const monthTotals = monthKeys.map((_, mi) =>
+    cats.reduce((s, c) => s + (monthRecs[mi]?.[c] ?? 0) + (monthEsts[mi]?.[c] ?? 0), 0),
+  )
   const maxIdx = monthTotals.indexOf(Math.max(...monthTotals))
+  const estInYear = monthEsts.some((e) => e && cats.some((c) => e[c] > 0.005))
   // oberstes sichtbares Segment je Monat -> nur dort abgerundete Datenenden
-  const topCat = monthRecs.map((r) => {
-    if (!r) return undefined
-    for (let i = cats.length - 1; i >= 0; i--) if (r[cats[i]] > 0.005) return cats[i]
+  // (Schaetz-Segmente liegen im Stack OBEN auf den belegten)
+  const topCat = monthKeys.map((_, mi) => {
+    for (let i = cats.length - 1; i >= 0; i--) {
+      const c = cats[i]
+      if ((monthEsts[mi]?.[c] ?? 0) > 0.005) return { cat: c, est: true }
+    }
+    for (let i = cats.length - 1; i >= 0; i--) {
+      const c = cats[i]
+      if ((monthRecs[mi]?.[c] ?? 0) > 0.005) return { cat: c, est: false }
+    }
     return undefined
   })
+  const capLabel = (mi: number) =>
+    ({
+      show: true,
+      position: 'top' as const,
+      color: t.textSecondary,
+      fontSize: 11,
+      formatter: () => fmtEur(monthTotals[mi]),
+    })
 
   const ax = axisDefaults(mode)
   const stackedOption = {
@@ -76,43 +97,59 @@ export function Overview() {
       itemWidth: 12,
       itemHeight: 12,
       textStyle: { color: t.textSecondary, fontSize: 12 },
+      // Schaetz-Serien nicht einzeln in die Legende — Kennzeichnung via Transparenz + Tooltip
+      data: cats.map((c) => CATEGORY_LABEL[c]),
     },
     grid: { left: 8, right: 12, top: 56, bottom: 4, containLabel: true },
     xAxis: { type: 'category', data: MONTH_LABELS, ...ax.category },
     yAxis: { type: 'value', ...ax.value },
-    series: cats.map((c) => ({
-      name: CATEGORY_LABEL[c],
-      type: 'bar',
-      stack: 'kosten',
-      barMaxWidth: 24,
-      itemStyle: { color: seriesColor(c, mode), borderColor: t.surface, borderWidth: 1 },
-      emphasis: { itemStyle: { borderColor: t.surface, borderWidth: 1 } },
-      data: monthRecs.map((r, mi) => ({
-        value: r ? Math.round(r[c] * 100) / 100 : 0,
-        itemStyle:
-          topCat[mi] === c
-            ? { color: seriesColor(c, mode), borderColor: t.surface, borderWidth: 1, borderRadius: [4, 4, 0, 0] }
-            : undefined,
-        // selektives Label: Gesamtsumme nur auf der Kappe des teuersten Monats
-        label:
-          topCat[mi] === c && mi === maxIdx
-            ? {
-                show: true,
-                position: 'top' as const,
-                color: t.textSecondary,
-                fontSize: 11,
-                formatter: () => fmtEur(monthTotals[mi]),
-              }
-            : undefined,
+    series: [
+      ...cats.map((c) => ({
+        name: CATEGORY_LABEL[c],
+        type: 'bar' as const,
+        stack: 'kosten',
+        barMaxWidth: 24,
+        itemStyle: { color: seriesColor(c, mode), borderColor: t.surface, borderWidth: 1 },
+        emphasis: { itemStyle: { borderColor: t.surface, borderWidth: 1 } },
+        data: monthRecs.map((r, mi) => ({
+          value: r ? Math.round(r[c] * 100) / 100 : 0,
+          itemStyle:
+            topCat[mi]?.cat === c && !topCat[mi]?.est
+              ? { color: seriesColor(c, mode), borderColor: t.surface, borderWidth: 1, borderRadius: [4, 4, 0, 0] }
+              : undefined,
+          // selektives Label: Gesamtsumme nur auf der Kappe des teuersten Monats
+          label: topCat[mi]?.cat === c && !topCat[mi]?.est && mi === maxIdx ? capLabel(mi) : undefined,
+        })),
       })),
-    })),
+      // Schaetz-Segmente: gleiche Farbe, reduzierte Deckkraft, oben im Stack
+      ...cats.map((c) => ({
+        name: `${CATEGORY_LABEL[c]} (geschätzt)`,
+        type: 'bar' as const,
+        stack: 'kosten',
+        barMaxWidth: 24,
+        itemStyle: { color: seriesColor(c, mode), opacity: 0.45, borderColor: t.surface, borderWidth: 1 },
+        emphasis: { itemStyle: { opacity: 0.6, borderColor: t.surface, borderWidth: 1 } },
+        data: monthEsts.map((e, mi) => ({
+          value: e ? Math.round(e[c] * 100) / 100 : 0,
+          itemStyle:
+            topCat[mi]?.cat === c && topCat[mi]?.est
+              ? { color: seriesColor(c, mode), opacity: 0.45, borderColor: t.surface, borderWidth: 1, borderRadius: [4, 4, 0, 0] }
+              : undefined,
+          label: topCat[mi]?.cat === c && topCat[mi]?.est && mi === maxIdx ? capLabel(mi) : undefined,
+        })),
+      })),
+    ],
   }
 
   // --- Chart 2: Jahresvergleich (Emphasis: gewaehltes Jahr farbig) ---------
   const yearSeries = years.map((y) => {
     const totals = MONTH_LABELS.map((_, i) => {
-      const rec = monthly.months.get(`${y}-${String(i + 1).padStart(2, '0')}`)
-      return rec ? Math.round(cats.reduce((s, c) => s + rec[c], 0) * 100) / 100 : null
+      const key = `${y}-${String(i + 1).padStart(2, '0')}`
+      const rec = monthly.months.get(key)
+      const est = withEst ? monthly.estimated.get(key) : undefined
+      if (!rec && !est) return null
+      const v = cats.reduce((s, c) => s + (rec?.[c] ?? 0) + (est?.[c] ?? 0), 0)
+      return Math.round(v * 100) / 100
     })
     const isSel = y === year
     // Direktes Label am letzten belegten Punkt — endLabel rechnet bei
@@ -212,6 +249,10 @@ export function Overview() {
           ))}
         </div>
         <div className="mx-2 h-5 w-px" style={{ background: 'var(--baseline)' }} />
+        <Chip active={withEst} onClick={() => setWithEst((v) => !v)}>
+          ~ Lücken schätzen
+        </Chip>
+        <div className="mx-2 h-5 w-px" style={{ background: 'var(--baseline)' }} />
         <div className="flex flex-wrap gap-1" role="group" aria-label="Kategorien">
           {CATEGORIES.map((c) => (
             <Chip
@@ -241,10 +282,21 @@ export function Overview() {
           {summary.monthsWithData < 12 ? ` (${summary.monthsWithData} Monate mit Daten)` : ''}
         </div>
         <div className="mt-1 text-5xl font-semibold">{fmtEur(avgPerMonth)}</div>
+        {withEst && summary.estimatedTotal > 0.5 && (
+          <div className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+            enthält ~{fmtEur(summary.estimatedTotal)} Schätzung für Beleg-Lücken (siehe Daten-Seite)
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label={`Gesamt ${year}`} value={fmtEur(filteredTotal)} delta={deltaPct} deltaLabel={`vs. ${year - 1}`} />
+        <StatTile
+          label={`Gesamt ${year}`}
+          value={fmtEur(filteredTotal)}
+          delta={deltaPct}
+          deltaLabel={`vs. ${year - 1}`}
+          hint={withEst && summary.estimatedTotal > 0.5 ? `davon ~${fmtEur(summary.estimatedTotal)} geschätzt` : undefined}
+        />
         <StatTile
           label="Strompreis effektiv"
           value={stromPrice !== undefined ? `${stromPrice.toLocaleString('de-DE', { maximumFractionDigits: 1 })} ct/kWh` : '–'}
@@ -265,6 +317,9 @@ export function Overview() {
       <div className="card p-4">
         <h2 className="mb-2 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
           Monatskosten {year} — periodisiert, nicht Zahlungsflüsse
+          {withEst && estInYear && (
+            <span style={{ color: 'var(--text-muted)' }}> · transparente Segmente = geschätzte Beleg-Lücken</span>
+          )}
         </h2>
         <EChart option={stackedOption} mode={mode} height={340} ariaLabel={`Gestapelte Monatskosten ${year} nach Kategorie`} />
       </div>
