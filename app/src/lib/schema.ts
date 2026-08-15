@@ -209,6 +209,24 @@ export const investmentSchema = z.object({
       note: z.string().optional(),
     }),
   }),
+  /** Warmwasser-Baustein (kombinierbar mit jedem Waermeerzeuger) */
+  ww: z.object({
+    kwhPerYear: z.number().positive(),
+    pvCoverPct: z.number().min(0).max(100),
+    bwwp: z.object({ cop: z.number().min(1), capexEur: z.number().nonnegative() }),
+    heizstab: z.object({ cop: z.number().min(1), capexEur: z.number().nonnegative() }),
+    note: z.string().optional(),
+  }),
+  /** Qualitaetseffekte der Kostenstruktur: Billig-Einbau -> mehr Reparaturen, schlechtere JAZ */
+  tierEffects: z.object({
+    maintenanceFactor: z.object({
+      guenstig: z.number().positive(),
+      typisch: z.number().positive(),
+      premium: z.number().positive(),
+    }),
+    jazDelta: z.object({ guenstig: z.number(), typisch: z.number(), premium: z.number() }),
+    note: z.string().optional(),
+  }),
   subsidyNote: z.string().optional(),
 })
 
