@@ -190,7 +190,17 @@ export function computeCombo(
   const selfPct = Math.min(100, s.pv.selfConsumptionPct + (sm?.selfConsumptionDeltaPp ?? 0))
   const wpCoverPct = Math.min(100, s.pvHeatPump.wpPvCoverPct + (sm?.wpPvCoverDeltaPp ?? 0))
   const wwCoverPct = Math.min(100, inv.ww.pvCoverPct + (sm?.wwPvCoverDeltaPp ?? 0))
-  const klimaCoverPct = Math.min(100, s.klima.pvCoverPct + (sm?.klimaPvCoverDeltaPp ?? 0))
+  /**
+   * Klima-Eigenstromdeckung gestaffelt: Basis = direkte PV-Deckung (heiss =
+   * sonnig), Smart-Vorkuehlung schiebt Last in die Sonnenstunden, ein
+   * Speicher traegt die Nachtkuehlung der Schlafzimmer -> bis 100 %.
+   */
+  const klimaCoverPct = Math.min(
+    100,
+    s.klima.pvCoverPct +
+      (sm?.klimaPvCoverDeltaPp ?? 0) +
+      (combo.pvKwp > 0 && combo.batteryKwh > 0 ? s.klima.batteryCoverDeltaPp : 0),
+  )
 
   const usefulHeatKwh = h.sterPerYear * h.kwhPerSter * h.oldBoilerEfficiency
   /** reiner Heizanteil: gemessene Nutzwaerme minus Warmwasser im Referenzjahr */
@@ -404,7 +414,7 @@ export function buildRecommendations(inv: InvestmentSettings): Recommendation[] 
     {
       title: '🛋 Vollausbau + Komfort — alles, inklusive kühler Schlafzimmer',
       combo: { heat: 'heatPump', pvKwp: 25, batteryKwh: b(25), ww: 'bestand', klima: true, smart: true },
-      why: `Maximale Dachbelegung, Wärmepumpe, Klima fürs Dachgeschoss (mit 4 Kindern in DG-Schlafzimmern der spürbarste Komfortgewinn — kühlt smart, wenn die Sonne liefert und kann übergangs auch heizen). Die teuerste, aber komplett zukunftsfeste Variante.`,
+      why: `Maximale Dachbelegung, Wärmepumpe, Klima fürs Dachgeschoss (mit 4 Kindern in DG-Schlafzimmern der spürbarste Komfortgewinn). Dank Speicher + Smart läuft die Klima zu 100 % aus Eigenstrom — vorkühlen in der Sonne, nachts aus dem Tagesüberschuss. Die teuerste, aber komplett zukunftsfeste Variante.`,
     },
   ]
 }

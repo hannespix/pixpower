@@ -22,7 +22,8 @@
   "power": {
     "consumptionKwh": 11600,
     "pricePerKwhCt": 26.0,
-    "note": "Verbrauch aus Zaehlerstaenden (~12.000 kWh/a inkl. Weingut), Preis aus schwarzwald-energy-Abschlaegen 2026."
+    "middayBaseLoadKw": 1.0,
+    "note": "Verbrauch aus Zaehlerstaenden (~12.000 kWh/a inkl. Weingut), Preis aus schwarzwald-energy-Abschlaegen 2026. middayBaseLoadKw: typische Mittagslast Haus + Weingut (Kuehlung, Geraete, Standby) fuer die PV-Dimensionierung."
   },
   "household": {
     "referenceYear": 2026,
@@ -98,6 +99,7 @@
         "premium": 1600
       },
       "selfConsumptionPct": 38,
+      "summerPeakFactor": 0.7,
       "feedInCtPerKwh": 7.0,
       "omPctOfCapex": 1.0,
       "inverterReplaceYear": 13,
@@ -130,8 +132,10 @@
       },
       "kwhPerYear": 450,
       "pvCoverPct": 60,
+      "batteryCoverDeltaPp": 20,
+      "powerKw": 2.0,
       "maintenanceEur": 100,
-      "note": "Multisplit fuer die 3-4 Schlafzimmer im isolierten DG (1998), inkl. Montage. Reiner Komfortbaustein — Kuehlstrom ~450 kWh/a laeuft genau dann, wenn PV liefert (60% PV-gedeckt). Kann in der Uebergangszeit auch effizient heizen (nicht eingerechnet)."
+      "note": "Multisplit fuer die 3-4 Schlafzimmer im isolierten DG (1998), inkl. Montage. Kuehlstrom ~450 kWh/a. Eigenstrom-Deckung gestaffelt, weil Schlafzimmer viel abends/nachts gekuehlt werden: 60% direkt aus PV (heiss = sonnig), +20%-Pkt. mit Smart (Vorkuehlung der Raeume am Nachmittag), +20%-Pkt. mit Speicher (Nachtkuehlung aus dem Tagesueberschuss) -> mit Speicher + Smart 100% Eigenstrom. Elektrische Leistung ~2,0 kW; kann in der Uebergangszeit auch effizient heizen (nicht eingerechnet)."
     },
     "elektro": {
       "label": "Elektro & Installation",
