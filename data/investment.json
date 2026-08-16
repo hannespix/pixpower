@@ -28,7 +28,12 @@
   "household": {
     "referenceYear": 2026,
     "adults": 2,
-    "kidBirthYears": [2015, 2016, 2019, 2022],
+    "kidBirthYears": [
+      2015,
+      2016,
+      2019,
+      2022
+    ],
     "teenFromAge": 12,
     "moveOutAge": 21,
     "stromKwhPerAdult": 500,
@@ -48,13 +53,13 @@
         "typisch": 23000,
         "premium": 28000
       },
-      "subsidyPct": 46,
       "subsidyCapEur": 28000,
       "subsidyExtraEur": 2500,
       "maintenanceEur": 250,
       "kaminkehrerEur": 150,
       "ownWorkFactor": 1.0,
-      "note": "BEG: 30% Grund + 16% Klimabonus (Biomasse >20 J. wird ersetzt; Solarthermie vorhanden -> Bonus-Bedingung fuer Biomasse erfuellt) + 2.500 EUR Emissionsminderungszuschlag."
+      "note": "BEG: 30% Grund + 16% Klimabonus (Biomasse >20 J. wird ersetzt; Solarthermie vorhanden -> Bonus-Bedingung fuer Biomasse erfuellt) + 2.500 EUR Emissionsminderungszuschlag.",
+      "subsidyBasePct": 30
     },
     "pellet": {
       "label": "Pelletkessel",
@@ -66,13 +71,13 @@
         "typisch": 34000,
         "premium": 42000
       },
-      "subsidyPct": 46,
       "subsidyCapEur": 28000,
       "subsidyExtraEur": 2500,
       "maintenanceEur": 320,
       "kaminkehrerEur": 150,
       "ownWorkHoursPerYear": 10,
-      "note": "Inkl. Lager/Austragung. Pelletpreis 330 EUR/t (Mittel 2026)."
+      "note": "Inkl. Lager/Austragung. Pelletpreis 330 EUR/t (Mittel 2026).",
+      "subsidyBasePct": 30
     },
     "heatPump": {
       "label": "Wärmepumpe",
@@ -82,12 +87,12 @@
         "typisch": 39000,
         "premium": 50000
       },
-      "subsidyPct": 46,
       "subsidyCapEur": 28000,
       "subsidyExtraEur": 0,
       "maintenanceEur": 150,
       "kaminkehrerEur": 0,
-      "note": "Luft-Wasser-WP im Altbau 1889: EG unsaniert (1 m Bruchstein), Heizkoerper -> hohe Vorlauftemperatur, JAZ 2,8 konservativ, grosse Maschine (~20 kW Heizlast). Deutlich besser erst nach Daemmung EG oder mit Flaechenheizung."
+      "note": "Luft-Wasser-WP im Altbau 1889: EG unsaniert (1 m Bruchstein), Heizkoerper -> hohe Vorlauftemperatur, JAZ 2,8 konservativ, grosse Maschine (~20 kW Heizlast). Deutlich besser erst nach Daemmung EG oder mit Flaechenheizung.",
+      "subsidyBasePct": 30
     },
     "pv": {
       "label": "Photovoltaik",
@@ -161,7 +166,7 @@
       "note": "Energiemanager (HEMS) + smarte Verzahnung der gewaehlten Systeme: WP laeuft SG-Ready in den Sonnenstunden (+10 %-Pkt. PV-Deckung), Warmwasser wird ueberschussgesteuert (+15 %-Pkt.), Klima kuehlt vor, wenn die Sonne scheint (+20 %-Pkt.), smarte Geraete/Lastverschiebung heben die Eigenverbrauchsquote (+7 %-Pkt.) und sparen ~4 % Haushaltsstrom. Wirkt nur auf tatsaechlich gewaehlte Bausteine."
     }
   },
-  "subsidyNote": "KfW 458 (Stand 08/2026): 30% Grundfoerderung + 16% Klimageschwindigkeitsbonus (sinkt ab 02/2027 alle 6 Monate um 4 Punkte!) auf max. 28.000 EUR foerderfaehige Kosten. Einkommensbonus +30% bei zu versteuerndem Haushaltseinkommen <= 40.000 EUR nicht eingerechnet. PV: 0% MwSt, EEG-Verguetung 20 Jahre garantiert.",
+  "subsidyNote": "KfW 458: 30 % Grundfoerderung + Klimageschwindigkeitsbonus je nach Projektstart (16 % nur bis Jan 2027, dann alle 6 Monate -4 %-Pkt.) auf max. 28.000 EUR foerderfaehige Kosten; Biomasse +2.500 EUR Emissionsminderungszuschlag. Einkommensbonus +30 % bei zu versteuerndem Haushaltseinkommen <= 40.000 EUR nicht eingerechnet. PV: 0 % MwSt, EEG-Verguetung 20 Jahre garantiert.",
   "ww": {
     "kwhPerYear": 3200,
     "pvCoverPct": 60,
@@ -187,5 +192,36 @@
       "premium": 0.15
     },
     "note": "Billig-Angebote sparen meist an Planung/Einbau, nicht am Geraet: mehr Stoerungen (Wartung/Reparatur x1,35) und bei der WP schlechtere Einregulierung (JAZ -0,2). Premium: sorgfaeltige Auslegung -> weniger Reparaturen, JAZ +0,15."
+  },
+  "plan": {
+    "defaultOption": "sommer27",
+    "capexEscalationPct": 2.0,
+    "options": [
+      {
+        "key": "jetzt",
+        "label": "sofort (2026)",
+        "yearOffset": 0,
+        "klimabonusPct": 16
+      },
+      {
+        "key": "fruehjahr27",
+        "label": "Frühjahr 2027",
+        "yearOffset": 1,
+        "klimabonusPct": 12
+      },
+      {
+        "key": "sommer27",
+        "label": "Sommer 2027",
+        "yearOffset": 1,
+        "klimabonusPct": 8
+      },
+      {
+        "key": "y2028",
+        "label": "2028",
+        "yearOffset": 2,
+        "klimabonusPct": 4
+      }
+    ],
+    "note": "Realistischer Projektstart verschiebt ALLES: KfW-458-Klimageschwindigkeitsbonus sinkt ab Feb 2027 alle 6 Monate um 4 %-Pkt. (Grundfoerderung 30 % bleibt), Energiepreise starten auf dem eskalierten Niveau des Startjahres, Marktpreise fuer Anlagen steigen ~2 %/a (Handwerk/Material). Selbst eingestellte Angebotspreise werden NICHT eskaliert — ein echtes Angebot gilt, wie es ist."
   }
 }

@@ -14,6 +14,7 @@ import {
   computeCombo,
   householdYear,
   recommendedBatteryKwh,
+  resolvePlan,
   type Combo,
   type ComboResult,
   type HeatKey,
@@ -66,6 +67,10 @@ export function Invest() {
   const inv = bundle.investment
   const s = inv.scenarios
   const [tier, setTier] = useState<Tier>('typisch')
+  const [planKey, setPlanKey] = useState<string>(inv.plan.defaultOption)
+  const planOpt = resolvePlan(inv, planKey)
+  /** Marktpreis-Eskalation bis zum Projektstart (fuer Regler-Marktwerte) */
+  const capexEscUI = Math.pow(1 + inv.plan.capexEscalationPct / 100, planOpt.yearOffset)
   const [custom, setCustom] = useState<Combo>({ heat: 'pellet', pvKwp: 20, batteryKwh: 10, ww: 'bwwp', klima: false, smart: true })
   const [overrides, setOverrides] = useState<Partial<Record<OvKey, number>>>({})
   const [tab, setTab] = useState<'verlauf' | 'jahr' | 'karten' | 'familie'>('verlauf')
@@ -86,7 +91,7 @@ export function Invest() {
       min: roundTo(heatSpec.capexEur.guenstig * 0.5, 500),
       max: roundTo(heatSpec.capexEur.premium * 1.4, 500),
       step: 500,
-      market: heatSpec.capexEur[tier],
+      market: roundTo(heatSpec.capexEur[tier] * capexEscUI, 100),
     })
   if (custom.pvKwp > 0)
     sliders.push({
@@ -95,7 +100,7 @@ export function Invest() {
       min: roundTo(s.pv.capexPerKwp.guenstig * 0.6, 25),
       max: roundTo(s.pv.capexPerKwp.premium * 1.5, 25),
       step: 25,
-      market: s.pv.capexPerKwp[tier],
+      market: roundTo(s.pv.capexPerKwp[tier] * capexEscUI, 5),
       perUnit: '€/kWp',
       totalOf: (v) => v * custom.pvKwp,
     })
@@ -106,7 +111,7 @@ export function Invest() {
       min: roundTo(s.battery.capexPerKwh.guenstig * 0.6, 25),
       max: roundTo(s.battery.capexPerKwh.premium * 1.5, 25),
       step: 25,
-      market: s.battery.capexPerKwh[tier],
+      market: roundTo(s.battery.capexPerKwh[tier] * capexEscUI, 5),
       perUnit: '€/kWh',
       totalOf: (v) => v * custom.batteryKwh,
     })
@@ -117,7 +122,7 @@ export function Invest() {
       min: Math.max(100, roundTo(wwSpec.capexEur * 0.3, 50)),
       max: roundTo(wwSpec.capexEur * 2.5, 50),
       step: 50,
-      market: wwSpec.capexEur,
+      market: roundTo(wwSpec.capexEur * capexEscUI, 50),
     })
   if (custom.klima)
     sliders.push({
@@ -126,7 +131,7 @@ export function Invest() {
       min: roundTo(s.klima.capexEur.guenstig * 0.5, 250),
       max: roundTo(s.klima.capexEur.premium * 1.5, 250),
       step: 250,
-      market: s.klima.capexEur[tier],
+      market: roundTo(s.klima.capexEur[tier] * capexEscUI, 50),
     })
   if (custom.smart)
     sliders.push({
@@ -135,7 +140,7 @@ export function Invest() {
       min: roundTo(s.smart.capexEur.guenstig * 0.5, 100),
       max: roundTo(s.smart.capexEur.premium * 1.6, 100),
       step: 100,
-      market: s.smart.capexEur[tier],
+      market: roundTo(s.smart.capexEur[tier] * capexEscUI, 50),
     })
   if (needsElektro)
     sliders.push({
@@ -144,17 +149,17 @@ export function Invest() {
       min: roundTo(s.elektro.capexEur.guenstig * 0.5, 100),
       max: roundTo(s.elektro.capexEur.premium * 1.6, 100),
       step: 100,
-      market: s.elektro.capexEur[tier],
+      market: roundTo(s.elektro.capexEur[tier] * capexEscUI, 50),
     })
   const activeOvCount = sliders.filter((sl) => overrides[sl.key] !== undefined).length
 
   const { results, statusQuo, customResult, best } = useMemo(() => {
-    const statusQuo = computeCombo(inv, tier, STATUS_QUO)
-    const presetResults = PRESETS.map((c) => computeCombo(inv, tier, c))
+    const statusQuo = computeCombo(inv, tier, STATUS_QUO, {}, planOpt)
+    const presetResults = PRESETS.map((c) => computeCombo(inv, tier, c, {}, planOpt))
     const ov: PriceOverrides = {}
     for (const sl of sliders) if (overrides[sl.key] !== undefined) ov[sl.key] = overrides[sl.key]
     const hasOv = Object.keys(ov).length > 0
-    const customResult = computeCombo(inv, tier, custom, ov)
+    const customResult = computeCombo(inv, tier, custom, ov, planOpt)
     if (hasOv) {
       customResult.key += '|A'
       customResult.label += ' · Angebotspreise'
@@ -167,21 +172,22 @@ export function Invest() {
     const best = candidates.reduce((a, b) => (b.horizonSavings > a.horizonSavings ? b : a))
     return { results, statusQuo, customResult: isDuplicate ? null : customResult, best }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inv, tier, custom, overrides])
+  }, [inv, tier, custom, overrides, planKey])
 
   const recResults = useMemo(() => {
-    const sq = computeCombo(inv, tier, STATUS_QUO)
+    const sq = computeCombo(inv, tier, STATUS_QUO, {}, planOpt)
     return recommendations.map((rec) => {
-      const r = computeCombo(inv, tier, rec.combo)
+      const r = computeCombo(inv, tier, rec.combo, {}, planOpt)
       attachComparison(sq, [sq, r])
       return { rec, r }
     })
-  }, [inv, tier, recommendations])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inv, tier, recommendations, planKey])
 
-  const startYear = new Date().getFullYear()
+  const startYear = new Date().getFullYear() + planOpt.yearOffset
   const H = inv.horizonYears
   const ax = axisDefaults(mode)
-  const yearsAxis = Array.from({ length: H + 1 }, (_, y) => (y === 0 ? 'heute' : String(startYear + y)))
+  const yearsAxis = Array.from({ length: H + 1 }, (_, y) => (y === 0 ? 'Start' : String(startYear + y)))
 
   const cumulativeOption = {
     ...baseOption(mode),
@@ -498,6 +504,26 @@ export function Invest() {
         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
           {inv.tierEffects.note}
         </p>
+        <Chips<string>
+          label="Projektstart"
+          value={planOpt.key}
+          options={inv.plan.options.map((o) => [o.key, o.label] as [string, string])}
+          onChange={setPlanKey}
+        />
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          KfW-Klimabonus bei diesem Start: <strong style={{ color: 'var(--text-primary)' }}>{planOpt.klimabonusPct} %</strong>
+          {planOpt.klimabonusPct < 16 && heatSpec && (
+            <>
+              {' '}(statt 16 % heute → bei deiner Heizung{' '}
+              <strong style={{ color: 'var(--critical)' }}>
+                −{fmtEur(Math.min(heatSpec.capexEur[tier] * capexEscUI, heatSpec.subsidyCapEur) * ((16 - planOpt.klimabonusPct) / 100))}
+              </strong>{' '}
+              Förderung)
+            </>
+          )}
+          . Energiepreise starten auf dem eskalierten Niveau des Startjahres, Marktpreise der Anlagen mit +{inv.plan.capexEscalationPct.toLocaleString('de-DE')} %/Jahr — deine per Regler
+          eingestellten Angebotspreise bleiben unangetastet.
+        </p>
 
         {/* Angebotspreise als Akkordeon, damit der Baukasten uebersichtlich bleibt */}
         <details className="rounded-lg border" style={{ borderColor: 'var(--grid)' }}>
@@ -571,7 +597,7 @@ export function Invest() {
       {/* Hero: beste Option */}
       <div className="card p-5">
         <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-          Beste Option über {H} Jahre ({TIER_LABEL[tier]})
+          Beste Option über {H} Jahre ({TIER_LABEL[tier]} · Start {planOpt.label} · Klimabonus {planOpt.klimabonusPct} %)
         </div>
         <div className="mt-1 flex flex-wrap items-baseline gap-x-3">
           <span className="flex items-center gap-2 text-3xl font-semibold">
@@ -790,9 +816,28 @@ export function Invest() {
         <summary className="cursor-pointer select-none p-4 text-sm font-semibold">🏛 Förderung (eingerechnet)</summary>
         <div className="px-5 pb-5 text-sm">
           <p style={{ color: 'var(--text-secondary)' }}>{inv.subsidyNote}</p>
+          {heatSpec && (
+            <div className="mt-3">
+              <div className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+                Was der Projektstart bei deiner Heizung ({heatSpec.label}, {TIER_LABEL[tier]}) ausmacht:
+              </div>
+              <ul className="tabular mt-1 space-y-0.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                {inv.plan.options.map((o) => {
+                  const capex = heatSpec.capexEur[tier] * Math.pow(1 + inv.plan.capexEscalationPct / 100, o.yearOffset)
+                  const sub = Math.min(capex, heatSpec.subsidyCapEur) * ((heatSpec.subsidyBasePct + o.klimabonusPct) / 100) + heatSpec.subsidyExtraEur
+                  return (
+                    <li key={o.key} className={o.key === planOpt.key ? 'font-semibold' : undefined}>
+                      {o.label}: {heatSpec.subsidyBasePct + o.klimabonusPct} % → {fmtEur(sub)} Förderung bei {fmtEur(capex)} Marktpreis
+                      {o.key === planOpt.key ? ' ← gewählt' : ''}
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )}
           <p className="mt-3 text-xs" style={{ color: 'var(--critical)' }}>
-            ⏳ Der 16-%-Klimageschwindigkeitsbonus sinkt ab Februar 2027 halbjährlich — bei der Heizung
-            kostet Warten bares Geld.
+            ⏳ Der Klimageschwindigkeitsbonus sinkt ab Februar 2027 halbjährlich um 4 %-Punkte, während
+            die Anlagenpreise weiter steigen — jedes Jahr Warten kostet doppelt.
           </p>
         </div>
       </details>
