@@ -62,6 +62,19 @@ export const WW_LABEL: Record<WwKey, string> = {
   heizstab: 'Heizstab',
 }
 
+/** Projektstart-Option (inv.plan.options) — verschiebt Foerderung & Preisniveau */
+export interface PlanOption {
+  key: string
+  label: string
+  yearOffset: number
+  klimabonusPct: number
+}
+
+export function resolvePlan(inv: InvestmentSettings, key?: string): PlanOption {
+  const k = key ?? inv.plan.defaultOption
+  return inv.plan.options.find((o) => o.key === k) ?? inv.plan.options[0]
+}
+
 export const comboKey = (c: Combo): string =>
   `${c.heat}|${c.pvKwp}|${c.pvKwp > 0 ? c.batteryKwh : 0}|${c.ww}|${c.klima ? 'K' : '-'}|${c.smart ? 'S' : '-'}`
 
@@ -174,9 +187,14 @@ export function computeCombo(
   tier: Tier,
   combo: Combo,
   ov: PriceOverrides = {},
+  plan: PlanOption = resolvePlan(inv),
 ): ComboResult {
   const H = inv.horizonYears
   const af = annuityFactor(inv.interestRatePct, H)
+  /** Jahre zwischen heute und Projektstart: Preise starten eskaliert */
+  const off = plan.yearOffset
+  /** Marktpreise steigen bis zum Start (~Handwerk/Material); echte Angebote (Overrides) nicht */
+  const capexEsc = Math.pow(1 + inv.plan.capexEscalationPct / 100, off)
   const h = inv.heat
   const s = inv.scenarios
   const fx = inv.tierEffects
@@ -209,14 +227,14 @@ export function computeCombo(
   const wwSpec = combo.ww === 'bwwp' ? inv.ww.bwwp : combo.ww === 'heizstab' ? inv.ww.heizstab : null
   const jaz = Math.max(1.5, s.heatPump.jaz + fx.jazDelta[tier])
 
-  /** Haushaltsstrom im Jahr y (nach Smart-Einsparung) */
+  /** Haushaltsstrom im Projektjahr y (Familienmodell ab Startjahr, nach Smart-Einsparung) */
   const consumption = (y: number): number =>
-    householdYear(inv, y).stromKwh * (1 - (sm?.householdSavingsPct ?? 0) / 100)
+    householdYear(inv, y + off).stromKwh * (1 - (sm?.householdSavingsPct ?? 0) / 100)
 
   // --- PV + Speicher -------------------------------------------------------
-  const pvPerKwp = ov.pvEurPerKwp ?? s.pv.capexPerKwp[tier]
+  const pvPerKwp = ov.pvEurPerKwp ?? s.pv.capexPerKwp[tier] * capexEsc
   const pvCapex = combo.pvKwp * pvPerKwp
-  const battCapex = battKwh * (ov.batteryEurPerKwh ?? s.battery.capexPerKwh[tier])
+  const battCapex = battKwh * (ov.batteryEurPerKwh ?? s.battery.capexPerKwh[tier] * capexEsc)
   /**
    * PV-Jahreswert (negativ = Ertrag): Eigenverbrauch zu Netzpreis,
    * Ueberschuss zu Einspeisung. `divertedKwh` (WW-/Klima-Strom aus
@@ -240,8 +258,8 @@ export function computeCombo(
     )
     const battOut = battIn * s.battery.efficiency
     surplus -= battIn
-    const priceCt = esc(stromCt, inv.escalationPct.strom, y)
-    const fCt = esc(feedCt, inv.escalationPct.einspeisung, y)
+    const priceCt = esc(stromCt, inv.escalationPct.strom, y + off)
+    const fCt = esc(feedCt, inv.escalationPct.einspeisung, y + off)
     return -((self + battOut) * priceCt + surplus * fCt) / 100
   }
   const pvOm = (y: number): number =>
@@ -259,26 +277,27 @@ export function computeCombo(
   const heatSpec =
     combo.heat === 'woodNew' ? s.woodNew : combo.heat === 'pellet' ? s.pellet : combo.heat === 'heatPump' ? s.heatPump : null
   if (heatSpec) {
-    const capex = ov.heatCapexEur ?? heatSpec.capexEur[tier]
+    const capex = ov.heatCapexEur ?? heatSpec.capexEur[tier] * capexEsc
     addItem('heatCapexEur', heatSpec.label, capex)
-    subsidy += Math.min(capex, heatSpec.subsidyCapEur) * (heatSpec.subsidyPct / 100) + heatSpec.subsidyExtraEur
+    // Foerderung haengt am Projektstart: Grundfoerderung + Klimabonus der gewaehlten Startoption
+    subsidy += Math.min(capex, heatSpec.subsidyCapEur) * ((heatSpec.subsidyBasePct + plan.klimabonusPct) / 100) + heatSpec.subsidyExtraEur
   }
   addItem('pvEurPerKwp', `${s.pv.label} ${combo.pvKwp} kWp`, pvCapex)
   addItem('batteryEurPerKwh', `${s.battery.label} ${battKwh} kWh`, battCapex)
-  if (wwSpec) addItem('wwCapexEur', WW_LABEL[combo.ww], ov.wwCapexEur ?? wwSpec.capexEur)
-  if (combo.klima) addItem('klimaCapexEur', s.klima.label, ov.klimaCapexEur ?? s.klima.capexEur[tier])
-  if (combo.smart) addItem('smartCapexEur', s.smart.label, ov.smartCapexEur ?? s.smart.capexEur[tier])
+  if (wwSpec) addItem('wwCapexEur', WW_LABEL[combo.ww], ov.wwCapexEur ?? wwSpec.capexEur * capexEsc)
+  if (combo.klima) addItem('klimaCapexEur', s.klima.label, ov.klimaCapexEur ?? s.klima.capexEur[tier] * capexEsc)
+  if (combo.smart) addItem('smartCapexEur', s.smart.label, ov.smartCapexEur ?? s.smart.capexEur[tier] * capexEsc)
   /** Zaehlerschrank & Co. — einmal, sobald irgendein Elektro-Baustein kommt */
   const needsElektro = combo.pvKwp > 0 || combo.heat === 'heatPump' || battKwh > 0 || combo.klima
-  if (needsElektro) addItem('elektroCapexEur', s.elektro.label, ov.elektroCapexEur ?? s.elektro.capexEur[tier])
+  if (needsElektro) addItem('elektroCapexEur', s.elektro.label, ov.elektroCapexEur ?? s.elektro.capexEur[tier] * capexEsc)
 
   const capexGross = items.reduce((sum, i) => sum + i.eur, 0)
   const capexNet = capexGross - subsidy
 
   // --- Jahreskosten --------------------------------------------------------
   const yearCosts = (y: number): CostBreakdown => {
-    const priceCt = esc(stromCt, inv.escalationPct.strom, y)
-    const hy = householdYear(inv, y)
+    const priceCt = esc(stromCt, inv.escalationPct.strom, y + off)
+    const hy = householdYear(inv, y + off)
     // Warmwasser + Heizbedarf des Jahres (Familienmodell)
     const wwCoveredKwh = wwSpec ? hy.wwKwh * (combo.pvKwp > 0 ? wwCoverPct / 100 : 1) : 0
     const wwStromKwh = wwSpec ? wwCoveredKwh / wwSpec.cop : 0
@@ -294,17 +313,17 @@ export function computeCombo(
 
     switch (combo.heat) {
       case 'bestand':
-        energie += (heatNeedKwh / (h.kwhPerSter * h.oldBoilerEfficiency)) * esc(h.eurPerSter, inv.escalationPct.holz, y)
+        energie += (heatNeedKwh / (h.kwhPerSter * h.oldBoilerEfficiency)) * esc(h.eurPerSter, inv.escalationPct.holz, y + off)
         betrieb += h.maintenanceOldEur + h.kaminkehrerEur
         eigenarbeit += h.ownWorkHoursPerYear * h.ownWorkEurPerHour
         break
       case 'woodNew':
-        energie += (heatNeedKwh / (h.kwhPerSter * s.woodNew.efficiency)) * esc(h.eurPerSter, inv.escalationPct.holz, y)
+        energie += (heatNeedKwh / (h.kwhPerSter * s.woodNew.efficiency)) * esc(h.eurPerSter, inv.escalationPct.holz, y + off)
         betrieb += s.woodNew.maintenanceEur * mf + s.woodNew.kaminkehrerEur
         eigenarbeit += h.ownWorkHoursPerYear * s.woodNew.ownWorkFactor * h.ownWorkEurPerHour
         break
       case 'pellet':
-        energie += (heatNeedKwh / (s.pellet.efficiency * s.pellet.kwhPerKg) / 1000) * esc(s.pellet.eurPerTon, inv.escalationPct.pellet, y)
+        energie += (heatNeedKwh / (s.pellet.efficiency * s.pellet.kwhPerKg) / 1000) * esc(s.pellet.eurPerTon, inv.escalationPct.pellet, y + off)
         betrieb += s.pellet.maintenanceEur * mf + s.pellet.kaminkehrerEur
         eigenarbeit += s.pellet.ownWorkHoursPerYear * h.ownWorkEurPerHour
         break
@@ -316,12 +335,12 @@ export function computeCombo(
 
     if (wwSpec) {
       // WW-Strom: aus PV-Ueberschuss zu Opportunitaetskosten, sonst Netz
-      const ct = combo.pvKwp > 0 ? esc(feedCt, inv.escalationPct.einspeisung, y) : priceCt
+      const ct = combo.pvKwp > 0 ? esc(feedCt, inv.escalationPct.einspeisung, y + off) : priceCt
       energie += (wwStromKwh * ct) / 100
     }
     if (combo.klima) {
       // PV-gedeckter Kuehlstrom zu Opportunitaetskosten, Rest aus dem Netz
-      const fCt = esc(feedCt, inv.escalationPct.einspeisung, y)
+      const fCt = esc(feedCt, inv.escalationPct.einspeisung, y + off)
       energie += (klimaPvKwh * fCt + (klimaKwh - klimaPvKwh) * priceCt) / 100
       betrieb += s.klima.maintenanceEur * mf
     }

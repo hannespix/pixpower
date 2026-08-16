@@ -154,6 +154,25 @@ export const investmentSchema = z.object({
     middayBaseLoadKw: z.number().nonnegative(),
     note: z.string().optional(),
   }),
+  /**
+   * Projektstart-Optionen: verschieben Foerderung (Klimabonus-Degression),
+   * Energiepreis-Niveau und Marktpreise (CAPEX-Eskalation) aufs Startjahr.
+   */
+  plan: z.object({
+    defaultOption: z.string(),
+    capexEscalationPct: z.number().min(0).max(10),
+    options: z
+      .array(
+        z.object({
+          key: z.string().min(1),
+          label: z.string().min(1),
+          yearOffset: z.number().int().min(0).max(10),
+          klimabonusPct: z.number().min(0).max(20),
+        }),
+      )
+      .min(1),
+    note: z.string().optional(),
+  }),
   /** Familien-Verbrauchsmodell: Personenbedarf nach Alter, dynamisch je Planungsjahr */
   household: z.object({
     referenceYear: z.number().int().min(2020).max(2100),
@@ -174,7 +193,7 @@ export const investmentSchema = z.object({
       label: z.string(),
       efficiency: z.number().min(0.5).max(1),
       capexEur: tierEur,
-      subsidyPct: z.number().min(0).max(80),
+      subsidyBasePct: z.number().min(0).max(80),
       subsidyCapEur: z.number().nonnegative(),
       subsidyExtraEur: z.number().nonnegative(),
       maintenanceEur: z.number().nonnegative(),
@@ -188,7 +207,7 @@ export const investmentSchema = z.object({
       eurPerTon: z.number().positive(),
       kwhPerKg: z.number().positive(),
       capexEur: tierEur,
-      subsidyPct: z.number().min(0).max(80),
+      subsidyBasePct: z.number().min(0).max(80),
       subsidyCapEur: z.number().nonnegative(),
       subsidyExtraEur: z.number().nonnegative(),
       maintenanceEur: z.number().nonnegative(),
@@ -200,7 +219,7 @@ export const investmentSchema = z.object({
       label: z.string(),
       jaz: z.number().min(1.5).max(6),
       capexEur: tierEur,
-      subsidyPct: z.number().min(0).max(80),
+      subsidyBasePct: z.number().min(0).max(80),
       subsidyCapEur: z.number().nonnegative(),
       subsidyExtraEur: z.number().nonnegative(),
       maintenanceEur: z.number().nonnegative(),
