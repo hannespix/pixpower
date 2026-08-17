@@ -1,19 +1,5 @@
 [
   {
-    "id": "2017-12-strom-neben",
-    "category": "strom",
-    "kind": "abrechnung",
-    "vendor": "EWS Schönau",
-    "date": "2017-12-18",
-    "periodStart": "2017-03-04",
-    "periodEnd": "2017-11-24",
-    "amountEur": 623.74,
-    "quantity": 2102,
-    "unit": "kWh",
-    "note": "Nebenzaehler (separate Marktlokation, lief bis 11/2017). Tarif EWS OEKOSTROM: 19,76 ct/kWh netto, Grundpreis 90,25 EUR/a.",
-    "sourceFile": "EWS_Abrechnung_2017-12.pdf"
-  },
-  {
     "id": "2018-04-strom",
     "category": "strom",
     "kind": "abrechnung",
@@ -24,7 +10,7 @@
     "amountEur": 1280.96,
     "quantity": 5219,
     "unit": "kWh",
-    "note": "Erste Abrechnung Hauptzaehler nach Vertragsbeginn 12.10.2017. EWS OEKO 30A: 17,75 ct/kWh netto (23,56 brutto), Grundpreis 100,80 EUR/a.",
+    "note": "Erste Abrechnung nach Versorgungsbeginn 12.10.2017 (Bestaetigung EWS vom 30.11.2017, damaliger Abschlag 267 EUR/Monat). EWS OEKO 30A: 17,75 ct/kWh netto (23,56 brutto), Grundpreis 100,80 EUR/a. Vor 10/2017 liegen fuer dieses Haus keine Belege vor.",
     "sourceFile": "EWS_Abrechnung_2018-04.pdf"
   },
   {

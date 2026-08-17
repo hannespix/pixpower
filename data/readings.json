@@ -168,22 +168,6 @@
     "unit": "kWh"
   },
   {
-    "id": "2017-03-04-strom-neben",
-    "meter": "strom-neben-alt",
-    "type": "strom",
-    "date": "2017-03-04",
-    "value": 32049,
-    "unit": "kWh"
-  },
-  {
-    "id": "2017-11-24-strom-neben",
-    "meter": "strom-neben-alt",
-    "type": "strom",
-    "date": "2017-11-24",
-    "value": 34151,
-    "unit": "kWh"
-  },
-  {
     "id": "r-strom-neu-2025-10-08",
     "meter": "strom-neu",
     "type": "strom",
