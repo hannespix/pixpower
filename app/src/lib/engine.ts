@@ -466,6 +466,88 @@ export function dataQualityIssues(
   return issues.sort((a, b) => (a.severity === b.severity ? 0 : a.severity === 'warning' ? -1 : 1))
 }
 
+// ---------------------------------------------------------------------------
+// Holz-Lagerbilanz
+// ---------------------------------------------------------------------------
+
+export interface WoodBalance {
+  /** Stichtag der Bilanz (= Datum der Bestandsangabe) */
+  asOf: string
+  /** ab wann die Holzbelege dicht genug fuer eine Bilanz sind */
+  since: string
+  /** belegte Einkaeufe seit `since` in Ster */
+  boughtSter: number
+  /** laut Verteilmodell bis zum Stichtag verheizt */
+  burnedSter: number
+  /** Modellbestand = gekauft - verheizt */
+  modelStockSter: number
+  /** gemeldeter Bestand (eigene Angabe) */
+  reportedStockSter: number
+  /** aus Kaeufen und Bestandsangabe abgeleiteter Jahresverbrauch */
+  impliedSterPerYear: number
+  /** Abweichung Modell vs. Angabe in Ster */
+  deviationSter: number
+}
+
+/**
+ * Vergleicht den modellierten Holzbestand mit einer eigenen Bestandsangabe.
+ *
+ * Das ist der einzige Weg, die Lagerdauer (`woodSpreadMonths`) zu pruefen:
+ * Ein Holzeinkauf sagt nichts darueber, WANN er verheizt wird. Weicht der
+ * Modellbestand stark von der Angabe ab, verteilt das Modell die Kosten zu
+ * traege (oder zu schnell) — dann gehoert `woodSpreadMonths` angepasst.
+ *
+ * Bilanziert wird erst ab dem Ende der letzten Beleg-Luecke, sonst wuerden
+ * fehlende Einkaufsbelege als "nie gekauft" in die Bilanz laufen.
+ */
+export function woodBalance(bundle: DataBundle): WoodBalance | null {
+  const stock = bundle.settings.woodStock
+  if (!stock) return null
+  const asOfDay = toDay(stock.date)
+  const purchases = bundle.invoices
+    .filter((i) => i.category === 'holz' && i.kind === 'einkauf' && i.quantity && i.date <= stock.date)
+    .sort((a, b) => a.date.localeCompare(b.date))
+  if (purchases.length === 0) return null
+
+  // Beginn der dichten Belegstrecke: nach der letzten Holz-Luecke von >90 Tagen
+  let since = purchases[0].date
+  for (let i = 1; i < purchases.length; i++) {
+    if (toDay(purchases[i].date) - toDay(purchases[i - 1].date) > 90) since = purchases[i].date
+  }
+  const relevant = purchases.filter((p) => p.date >= since)
+
+  let boughtSter = 0
+  let burnedSter = 0
+  for (const p of relevant) {
+    const ster = p.quantity ?? 0
+    boughtSter += ster
+    const start = toDay(p.date)
+    const end = addMonths(p.date, bundle.settings.woodSpreadMonths) - 1
+    let wSum = 0
+    let wDone = 0
+    for (let day = start; day <= end; day++) {
+      const w = dayWeight(day, true, bundle.settings)
+      wSum += w
+      if (day < asOfDay) wDone += w
+    }
+    burnedSter += wSum > 0 ? ster * (wDone / wSum) : ster
+  }
+
+  const spanDays = Math.max(asOfDay - toDay(since), 1)
+  const impliedSterPerYear = ((boughtSter - stock.ster) / spanDays) * 365
+  const modelStockSter = boughtSter - burnedSter
+  return {
+    asOf: stock.date,
+    since,
+    boughtSter,
+    burnedSter,
+    modelStockSter,
+    reportedStockSter: stock.ster,
+    impliedSterPerYear,
+    deviationSter: modelStockSter - stock.ster,
+  }
+}
+
 export const yearsWithData = (mc: MonthlyCosts): number[] =>
   [...new Set(mc.keys.map((k) => Number(k.slice(0, 4))))].sort()
 

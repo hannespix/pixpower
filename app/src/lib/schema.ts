@@ -105,6 +105,18 @@ export const settingsSchema = z.object({
   demoData: z.boolean().default(false),
   /** Ueber wie viele Monate ein Holzeinkauf verheizt wird */
   woodSpreadMonths: z.number().int().min(1).max(36).default(12),
+  woodSpreadMonthsNote: z.string().optional(),
+  /**
+   * Gemeldeter Holz-Lagerbestand zu einem Stichtag — Kalibrierpunkt fuer die
+   * Lagerdauer und Plausibilitaetspruefung des Jahresverbrauchs.
+   */
+  woodStock: z
+    .object({
+      date: isoDate,
+      ster: z.number().nonnegative(),
+      note: z.string().optional(),
+    })
+    .optional(),
   /** Monatsanteile der Jahresheizarbeit (Jan..Dez), Summe ~1 */
   hddProfile: z
     .array(z.number().nonnegative())

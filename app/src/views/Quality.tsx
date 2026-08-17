@@ -1,8 +1,10 @@
 import { useMemo } from 'react'
 import { useData } from '../state/DataProvider'
 import { useTheme } from '../hooks/useTheme'
-import { dataQualityIssues, fmtEur } from '../lib/engine'
+import { dataQualityIssues, fmtEur, woodBalance } from '../lib/engine'
 import { seriesColor } from '../lib/palette'
+
+const fmtSter = (v: number) => `${v.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Ster`
 
 /**
  * Datenqualitaets-Seite: die "Wunschliste" — welche Belege fehlen, welche
@@ -16,6 +18,7 @@ export function Quality() {
   const warnings = issues.filter((i) => i.severity === 'warning')
   const infos = issues.filter((i) => i.severity === 'info')
   const estTotal = monthly.gaps.reduce((s, g) => s + g.estimatedEur, 0)
+  const wood = useMemo(() => woodBalance(bundle), [bundle])
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
@@ -31,6 +34,42 @@ export function Quality() {
           automatisch durch die echten Zahlen ersetzt.
         </p>
       </div>
+
+      {wood && (
+        <div className="card p-5">
+          <h3 className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+            <span aria-hidden className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: seriesColor('holz', mode) }} />
+            Brennholz-Lagerbilanz
+            <span className="text-xs font-normal" style={{ color: 'var(--text-muted)' }}>
+              Stand {new Date(wood.asOf).toLocaleDateString('de-DE')} · eigene Angabe
+            </span>
+          </h3>
+          <dl className="tabular mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+            <Line label={`Einkäufe seit ${new Date(wood.since).toLocaleDateString('de-DE')}`} value={fmtSter(wood.boughtSter)} />
+            <Line label="dein Restbestand" value={fmtSter(wood.reportedStockSter)} strong />
+            <Line label="laut Verteilmodell verheizt" value={fmtSter(wood.burnedSter)} />
+            <Line label="Modell-Restbestand" value={fmtSter(wood.modelStockSter)} />
+          </dl>
+          <p className="mt-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
+            Daraus abgeleiteter Jahresverbrauch:{' '}
+            <strong style={{ color: 'var(--text-primary)' }}>{fmtSter(wood.impliedSterPerYear)}/Jahr</strong> — die
+            Investitionsrechnung arbeitet mit {bundle.investment.heat.sterPerYear} Ster/Jahr
+            {Math.abs(wood.impliedSterPerYear - bundle.investment.heat.sterPerYear) <= 3 ? (
+              <span style={{ color: 'var(--good-text)' }}> ✓ bestätigt</span>
+            ) : (
+              <span style={{ color: 'var(--critical)' }}> — Abweichung, Annahme prüfen</span>
+            )}
+            .
+          </p>
+          <p className="mt-2 text-xs" style={{ color: Math.abs(wood.deviationSter) > 3 ? 'var(--critical)' : 'var(--text-muted)' }}>
+            {Math.abs(wood.deviationSter) > 3
+              ? `⚠ Das Modell liegt ${fmtSter(Math.abs(wood.deviationSter))} ${wood.deviationSter > 0 ? 'über' : 'unter'} deiner Angabe — die Lagerdauer von ${bundle.settings.woodSpreadMonths} Monaten verteilt die Kosten zu ${wood.deviationSter > 0 ? 'träge' : 'schnell'}.`
+              : `Modell und Angabe passen zusammen (${fmtSter(Math.abs(wood.deviationSter))} Abweichung) — die Lagerdauer von ${bundle.settings.woodSpreadMonths} Monaten ist damit an der Realität kalibriert.`}{' '}
+            Ein Holzeinkauf sagt nicht, wann er verheizt wird; erst deine Bestandsangabe macht die zeitliche
+            Zuordnung überprüfbar. Neue Angabe? Einfach durchgeben.
+          </p>
+        </div>
+      )}
 
       {warnings.length > 0 && (
         <div className="space-y-2">
@@ -53,6 +92,15 @@ export function Quality() {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function Line({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className="flex items-baseline justify-between gap-2">
+      <dt style={{ color: 'var(--text-secondary)' }}>{label}</dt>
+      <dd className={strong ? 'font-semibold' : undefined}>{value}</dd>
     </div>
   )
 }
