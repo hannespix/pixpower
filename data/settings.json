@@ -7,7 +7,7 @@
     "buildingNote": "Baujahr 1889, EG unsaniert (~1 m Bruchsteinwaende, Doppelverglasung), DG 1998 komplett isoliert. 3 grosse + 1 normales Schlafzimmer (DG), Kueche/Wohnzimmer/Buero (EG), kleine Sauna mit Elektroofen."
   },
   "demoData": false,
-  "woodSpreadMonths": 12,
+  "woodSpreadMonths": 7,
   "hddProfile": [
     0.17,
     0.14,
@@ -22,5 +22,11 @@
     0.14,
     0.17
   ],
-  "hddProfileNote": "Monatsanteile der Jahresheizarbeit (Gradtagzahlen, langjaehriges Mittel Deutschland). Summe = 1. Wird zur Periodisierung von Waermekosten verwendet."
+  "hddProfileNote": "Monatsanteile der Jahresheizarbeit (Gradtagzahlen, langjaehriges Mittel Deutschland). Summe = 1. Wird zur Periodisierung von Waermekosten verwendet.",
+  "woodStock": {
+    "date": "2026-08-17",
+    "ster": 2,
+    "note": "Eigene Angabe (Restbestand Forstbetrieb Haensler). Dient als Kalibrierpunkt: Aus den Kaeufen seit 09/2025 (27 Ster) und diesem Bestand ergeben sich ~25 Ster Verbrauch in 11,5 Monaten — deckt sich mit den 26 Ster/Jahr der Investitionsrechnung. Die Lagerdauer (woodSpreadMonths) ist daran kalibriert: 12 Monate ergaben 11,4 Ster Modellbestand und damit viel zu traege Kostenverteilung, 7 Monate treffen die Realitaet (~2,7 Ster)."
+  },
+  "woodSpreadMonthsNote": "Ueber wie viele Monate ein Holzeinkauf verheizt wird — an der Bestandsangabe kalibriert (siehe woodStock), entspricht der Heizperiode Okt-Apr. Frueher 12 Monate, was Kosten faelschlich bis ins Folgejahr schob."
 }
