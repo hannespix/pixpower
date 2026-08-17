@@ -23,7 +23,7 @@
     "consumptionKwh": 11600,
     "pricePerKwhCt": 26.0,
     "middayBaseLoadKw": 1.0,
-    "note": "Verbrauch aus Zaehlerstaenden (~12.000 kWh/a inkl. Weingut), Preis aus schwarzwald-energy-Abschlaegen 2026. middayBaseLoadKw: typische Mittagslast Haus + Weingut (Kuehlung, Geraete, Standby) fuer die PV-Dimensionierung."
+    "note": "Verbrauch aus Zaehlerstaenden 2017-2025 (Jahreswerte: 2018: 11.503, 2020: 12.763, 2021: 12.946, 2022: 11.994, 2023: 11.965, 2024: 12.065, 2025 rueckläufig ~10.100 kWh) — 11.600 kWh als Planwert zwischen Vierjahresmittel und aktuellem Niveau. Preis 26 ct/kWh brutto aus dem schwarzwald-energy-Abschlag (251 EUR/Monat) ab 28.11.2025; zuvor EWS mit bis zu 37,7 ct/kWh brutto in der Energiekrise. middayBaseLoadKw: typische Mittagslast Haus + Weingut fuer die PV-Dimensionierung."
   },
   "household": {
     "referenceYear": 2026,

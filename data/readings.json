@@ -1,19 +1,67 @@
 [
   {
-    "id": "r-wasser-2021-12-06",
-    "meter": "wasser-haupt",
-    "type": "wasser",
-    "date": "2021-12-06",
-    "value": 548,
-    "unit": "m3"
+    "id": "2019-11-14-strom",
+    "meter": "strom-alt",
+    "type": "strom",
+    "date": "2019-11-14",
+    "value": 0,
+    "unit": "kWh"
   },
   {
-    "id": "r-wasser-2022-12-09",
-    "meter": "wasser-haupt",
-    "type": "wasser",
-    "date": "2022-12-09",
-    "value": 832,
-    "unit": "m3"
+    "id": "2019-12-31-strom",
+    "meter": "strom-alt",
+    "type": "strom",
+    "date": "2019-12-31",
+    "value": 1503,
+    "unit": "kWh"
+  },
+  {
+    "id": "2020-04-15-strom",
+    "meter": "strom-alt",
+    "type": "strom",
+    "date": "2020-04-15",
+    "value": 4744,
+    "unit": "kWh"
+  },
+  {
+    "id": "2021-04-09-strom",
+    "meter": "strom-alt",
+    "type": "strom",
+    "date": "2021-04-09",
+    "value": 17883,
+    "unit": "kWh"
+  },
+  {
+    "id": "2021-12-31-strom",
+    "meter": "strom-alt",
+    "type": "strom",
+    "date": "2021-12-31",
+    "value": 27204,
+    "unit": "kWh"
+  },
+  {
+    "id": "2022-03-17-strom",
+    "meter": "strom-alt",
+    "type": "strom",
+    "date": "2022-03-17",
+    "value": 30151,
+    "unit": "kWh"
+  },
+  {
+    "id": "2022-06-30-strom",
+    "meter": "strom-alt",
+    "type": "strom",
+    "date": "2022-06-30",
+    "value": 33376,
+    "unit": "kWh"
+  },
+  {
+    "id": "2022-12-31-strom",
+    "meter": "strom-alt",
+    "type": "strom",
+    "date": "2022-12-31",
+    "value": 39203,
+    "unit": "kWh"
   },
   {
     "id": "r-strom-alt-2023-03-09",
@@ -40,6 +88,22 @@
     "unit": "kWh"
   },
   {
+    "id": "2024-12-31-strom",
+    "meter": "strom-alt",
+    "type": "strom",
+    "date": "2024-12-31",
+    "value": 63232,
+    "unit": "kWh"
+  },
+  {
+    "id": "2025-03-31-strom",
+    "meter": "strom-alt",
+    "type": "strom",
+    "date": "2025-03-31",
+    "value": 66426,
+    "unit": "kWh"
+  },
+  {
     "id": "r-strom-alt-2025-09-01",
     "meter": "strom-alt",
     "type": "strom",
@@ -61,6 +125,62 @@
     "type": "strom",
     "date": "2025-10-07",
     "value": 70715,
+    "unit": "kWh"
+  },
+  {
+    "id": "2017-10-12-strom-haus",
+    "meter": "strom-haus-alt",
+    "type": "strom",
+    "date": "2017-10-12",
+    "value": 162093,
+    "unit": "kWh"
+  },
+  {
+    "id": "2018-03-16-strom-haus",
+    "meter": "strom-haus-alt",
+    "type": "strom",
+    "date": "2018-03-16",
+    "value": 167312,
+    "unit": "kWh"
+  },
+  {
+    "id": "2018-12-31-strom-haus",
+    "meter": "strom-haus-alt",
+    "type": "strom",
+    "date": "2018-12-31",
+    "value": 176292,
+    "unit": "kWh"
+  },
+  {
+    "id": "2019-03-29-strom-haus",
+    "meter": "strom-haus-alt",
+    "type": "strom",
+    "date": "2019-03-29",
+    "value": 179017,
+    "unit": "kWh"
+  },
+  {
+    "id": "2019-11-13-strom-haus",
+    "meter": "strom-haus-alt",
+    "type": "strom",
+    "date": "2019-11-13",
+    "value": 186269,
+    "unit": "kWh"
+  },
+  {
+    "id": "2017-03-04-strom-neben",
+    "meter": "strom-neben-alt",
+    "type": "strom",
+    "date": "2017-03-04",
+    "value": 32049,
+    "unit": "kWh"
+  },
+  {
+    "id": "2017-11-24-strom-neben",
+    "meter": "strom-neben-alt",
+    "type": "strom",
+    "date": "2017-11-24",
+    "value": 34151,
     "unit": "kWh"
   },
   {
@@ -94,5 +214,61 @@
     "date": "2025-11-27",
     "value": 1719,
     "unit": "kWh"
+  },
+  {
+    "id": "r-wasser-2021-12-06",
+    "meter": "wasser-haupt",
+    "type": "wasser",
+    "date": "2021-12-06",
+    "value": 548,
+    "unit": "m3"
+  },
+  {
+    "id": "r-wasser-2022-12-09",
+    "meter": "wasser-haupt",
+    "type": "wasser",
+    "date": "2022-12-09",
+    "value": 832,
+    "unit": "m3"
+  },
+  {
+    "id": "2023-12-05-wasser",
+    "meter": "wasser-haupt",
+    "type": "wasser",
+    "date": "2023-12-05",
+    "value": 1158,
+    "unit": "m3"
+  },
+  {
+    "id": "2024-11-30-wasser",
+    "meter": "wasser-haupt",
+    "type": "wasser",
+    "date": "2024-11-30",
+    "value": 1343,
+    "unit": "m3"
+  },
+  {
+    "id": "2025-02-20-wasser",
+    "meter": "wasser-haupt",
+    "type": "wasser",
+    "date": "2025-02-20",
+    "value": 1376,
+    "unit": "m3"
+  },
+  {
+    "id": "2025-02-21-wasser-neu",
+    "meter": "wasser-neu",
+    "type": "wasser",
+    "date": "2025-02-21",
+    "value": 0,
+    "unit": "m3"
+  },
+  {
+    "id": "2025-10-10-wasser-neu",
+    "meter": "wasser-neu",
+    "type": "wasser",
+    "date": "2025-10-10",
+    "value": 103,
+    "unit": "m3"
   }
 ]
